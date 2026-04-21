@@ -1098,15 +1098,9 @@ function renderAdminUsers(reb){
       credBox.className="alert alert-ok";credBox.style.display="block";
       const savedPw=pI.value.trim(),savedEmail=email,savedName=nI.value.trim();
       nI.value="";eI.value="";pI.value="";const wasEdit=editUserId;editUserId=null;
-      credBox.textContent="✓ "+(wasEdit?"Обновлено":"Создан")+"! Передайте участнику:
-
-Ссылка: "+appUrl+"
-Логин: "+savedEmail+"
-Пароль: "+savedPw;
+      credBox.textContent="✓ "+(wasEdit?"Обновлено":"Создан")+"! Передайте участнику:\n\nСсылка: "+appUrl+"\nЛогин: "+savedEmail+"\nПароль: "+savedPw;
       // Copy to clipboard
-      navigator.clipboard?.writeText("Ссылка: "+appUrl+"
-Логин: "+savedEmail+"
-Пароль: "+savedPw).catch(()=>{});
+      navigator.clipboard?.writeText("Ссылка: "+appUrl+"\nЛогин: "+savedEmail+"\nПароль: "+savedPw).catch(()=>{});
       setTimeout(()=>{ credBox.style.display="none"; reb&&reb(); },8000);
     }},editUserId?"Сохранить":"Создать"),
     h("button",{cls:"btn bs",onclick:()=>{showF=false;editUserId=null;rebF();credBox.style.display="none";}},"Отмена")
