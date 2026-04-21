@@ -1,0 +1,1488 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1.0,maximum-scale=1.0">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-title" content="Доктор Войнов">
+<title>Доктор Войнов — Клиника</title>
+<link href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+<style>
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+html,body{height:100%;font-family:"Manrope",sans-serif;-webkit-tap-highlight-color:transparent}
+:root{--p:#0D6E5F;--plt:#1A8A78;--pll:#E8F5F2;--a:#C9720A;--r:#DC2626;--bg:#F4F1EC;--sf:#fff;--bd:rgba(0,0,0,0.08);--tx:#1A1A1A;--mu:#6B7280;--hi:#9CA3AF}
+body{background:var(--bg)}
+.hdr{background:var(--p);color:#fff;padding:13px 18px;display:flex;align-items:center;justify-content:space-between;position:sticky;top:0;z-index:50}
+.ht{font-size:15px;font-weight:700}.hs{font-size:11px;opacity:.65;margin-top:1px}
+.hb{background:rgba(255,255,255,.18);border:none;color:#fff;padding:5px 12px;border-radius:8px;font-size:12px;cursor:pointer;font-family:inherit}
+.scr{flex:1;overflow-y:auto;padding:16px;max-width:640px;width:100%;margin:0 auto;padding-bottom:90px}
+.bn{background:#fff;border-top:1px solid var(--bd);display:flex;position:fixed;bottom:0;left:0;right:0;z-index:50}
+.bt{flex:1;display:flex;flex-direction:column;align-items:center;padding:10px 4px 14px;border:none;background:none;cursor:pointer;color:var(--hi);font-family:inherit;position:relative}
+.bt.on{color:var(--p)}.bti{font-size:22px;margin-bottom:2px}.btl{font-size:10px;font-weight:600}
+.bdg{position:absolute;top:6px;right:calc(50% - 20px);background:#EF4444;color:#fff;font-size:9px;font-weight:700;padding:1px 5px;border-radius:10px;min-width:16px;text-align:center}
+.card{background:var(--sf);border-radius:14px;padding:14px;margin-bottom:10px;border:1px solid var(--bd)}
+.crow{background:var(--sf);border-radius:12px;padding:11px 14px;margin-bottom:8px;border:1px solid var(--bd);display:flex;align-items:center;gap:12px;cursor:pointer}
+.crow:active{border-color:var(--p)}
+.st{font-size:11px;font-weight:700;color:var(--hi);text-transform:uppercase;letter-spacing:.8px;margin:14px 0 8px}
+.btn{display:inline-flex;align-items:center;justify-content:center;gap:6px;padding:11px 18px;border-radius:10px;border:none;font-family:inherit;font-size:14px;font-weight:600;cursor:pointer}
+.btn:disabled{opacity:.4;cursor:default}
+.bp{background:var(--p);color:#fff}.bp:active:not(:disabled){background:var(--plt)}
+.bs{background:var(--pll);color:var(--p)}.ba{background:#FEF3E2;color:var(--a)}.br{background:#FEF2F2;color:var(--r)}
+.bw{width:100%}.bsm{padding:7px 14px;font-size:12px;border-radius:8px}
+.bbk{background:none;border:none;color:var(--p);font-family:inherit;font-size:14px;font-weight:600;cursor:pointer;display:flex;align-items:center;gap:4px;padding:0;margin-bottom:16px}
+.fg{margin-bottom:13px}.fl{font-size:11px;font-weight:700;color:var(--mu);text-transform:uppercase;letter-spacing:.5px;margin-bottom:5px;display:block}
+.fi{width:100%;padding:11px 13px;border:1.5px solid var(--bd);border-radius:10px;font-family:inherit;font-size:15px;color:var(--tx);background:#fff;outline:none;-webkit-appearance:none}
+.fi:focus{border-color:var(--p)}
+select.fi{background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='10' viewBox='0 0 10 10'%3E%3Cpath fill='%236B7280' d='M5 7L1 3h8z'/%3E%3C/svg%3E");background-repeat:no-repeat;background-position:right 12px center;padding-right:30px}
+textarea.fi{min-height:72px;resize:vertical;font-size:14px}
+.av{width:40px;height:40px;border-radius:50%;background:var(--pll);display:flex;align-items:center;justify-content:center;font-size:15px;font-weight:700;color:var(--p);flex-shrink:0}
+.task-item{background:#fff;border-radius:12px;border:1px solid var(--bd);margin-bottom:8px;overflow:hidden}
+.task-hdr{display:flex;align-items:center;gap:10px;padding:11px 12px;cursor:pointer}
+.task-body{padding:12px;border-top:1px solid var(--bd);display:none}
+.task-done-btn{background:var(--pll);color:var(--p);border:none;border-radius:8px;padding:5px 10px;font-size:11px;font-weight:700;cursor:pointer;font-family:inherit;flex-shrink:0}
+.tag{display:inline-block;padding:2px 8px;border-radius:20px;font-size:11px;font-weight:600}
+.slt{display:inline-flex;flex-direction:column;padding:7px 10px;border-radius:8px;font-size:12px;font-weight:600;cursor:pointer;border:1.5px solid transparent;margin:3px;min-width:64px;text-align:center}
+@media(max-width:380px){.slt{min-width:54px;padding:6px 7px;font-size:11px}}
+.slt.fr{background:var(--pll);color:var(--p)}.slt.bk{background:#EEF2FF;color:#4F46E5}.slt.cls{background:#F3F4F6;color:var(--hi);cursor:default}
+.slt-name{font-size:9px;font-weight:500;margin-top:2px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;max-width:74px}
+.dr{display:flex;gap:6px;overflow-x:auto;padding-bottom:4px;margin-bottom:14px;scrollbar-width:none;-webkit-overflow-scrolling:touch}
+.dr::-webkit-scrollbar{display:none}
+.dc{flex-shrink:0;padding:8px 12px;border-radius:9px;border:1.5px solid var(--bd);background:#fff;cursor:pointer;font-size:13px;font-weight:600;color:var(--mu);font-family:inherit;line-height:1.3;text-align:center;min-width:48px}
+.dc.on{background:var(--p);color:#fff;border-color:var(--p)}.dsb{font-size:10px;display:block}
+.ir{display:flex;align-items:flex-start;justify-content:space-between;gap:12px;padding:9px 0;border-bottom:1px solid var(--bd)}
+.ir:last-child{border:none}.ik{font-size:12px;color:var(--mu);flex-shrink:0;padding-top:1px}.iv{font-size:13px;font-weight:600;text-align:right;max-width:60%}
+.emp{text-align:center;padding:40px 20px;color:var(--mu)}.empi{font-size:40px;margin-bottom:10px}
+.tabs{display:flex;gap:6px;margin-bottom:16px;flex-wrap:wrap}
+.tb{padding:7px 14px;border-radius:8px;border:none;cursor:pointer;font-family:inherit;font-size:13px;font-weight:600}
+.tb.on{background:var(--p);color:#fff}.tb.off{background:var(--bg);color:var(--mu)}
+.syncbar{padding:5px 16px;display:flex;align-items:center;justify-content:space-between;font-size:12px}
+.syncbar.ok{background:#E8F5F2;color:#059669}.syncbar.saving{background:#FEF3E2;color:#C9720A}.syncbar.err{background:#FEF2F2;color:#DC2626}
+.syncbar button{background:none;border:1px solid currentColor;font-size:11px;cursor:pointer;color:inherit;font-family:inherit;padding:2px 6px;border-radius:4px}
+.desktop{display:flex;min-height:100vh}
+.sb{width:200px;background:#fff;border-right:1px solid var(--bd);padding:16px 10px;display:flex;flex-direction:column;flex-shrink:0;position:sticky;top:0;height:100vh;overflow-y:auto}
+.si{display:flex;align-items:center;gap:10px;padding:9px 11px;border-radius:9px;cursor:pointer;color:var(--mu);font-size:14px;font-weight:600;margin-bottom:3px;border:none;background:none;width:100%;font-family:inherit;text-align:left}
+.si:hover{background:var(--bg)}.si.on{background:var(--pll);color:var(--p)}
+.dmain{flex:1;padding:24px;overflow-y:auto;max-height:100vh}
+.sg{display:grid;grid-template-columns:repeat(3,1fr);gap:10px;margin-bottom:20px}
+.sc{background:#fff;border-radius:12px;padding:14px 10px;text-align:center;border:1px solid var(--bd)}
+.sn{font-size:26px;font-weight:800;color:var(--p)}.sl{font-size:11px;color:var(--mu);margin-top:2px}
+.tbl{width:100%;border-collapse:collapse;font-size:13px}
+.tbl th{background:var(--bg);padding:9px 12px;text-align:left;font-size:11px;font-weight:700;color:var(--mu);text-transform:uppercase;letter-spacing:.5px}
+.tbl td{padding:11px 12px;border-bottom:1px solid var(--bd)}
+.tbl tbody tr{cursor:pointer}.tbl tbody tr:hover td{background:#FAFAF8}
+.login-wrap{min-height:100vh;display:flex;align-items:center;justify-content:center;padding:24px}
+.login-box{width:100%;max-width:400px}
+.setup-box{width:100%;max-width:440px}
+.roles{min-height:100vh;display:flex;flex-direction:column;align-items:center;justify-content:center;padding:24px}
+.role-card{background:#fff;border-radius:14px;padding:16px 20px;width:100%;max-width:340px;border:2px solid var(--bd);cursor:pointer;margin-bottom:10px;display:flex;align-items:center;gap:14px}
+.role-card:hover,.role-card:active{border-color:var(--p)}
+.block-card{background:#fff;border-radius:10px;border:1px solid var(--bd);padding:11px 14px;margin-bottom:8px;display:flex;align-items:center;justify-content:space-between}
+.alert{border-radius:10px;padding:10px 14px;font-size:13px;margin-bottom:10px}
+.alert-warn{background:#FEF3E2;color:#92400E}.alert-err{background:#FEF2F2;color:#991B1B}.alert-ok{background:#E8F5F2;color:#065F46}
+.datefield{display:grid;grid-template-columns:1fr 1fr;gap:8px}
+.overlay{position:fixed;inset:0;background:rgba(0,0,0,.5);z-index:100;display:flex;align-items:flex-end;justify-content:center}
+.modal{background:#fff;border-radius:20px 20px 0 0;padding:20px 18px 36px;width:100%;max-width:620px;max-height:90vh;overflow-y:auto}
+.badge{display:inline-block;padding:1px 7px;border-radius:12px;font-size:10px;font-weight:700;margin-left:6px}
+@media(max-width:600px){.tbl th:nth-child(4),.tbl td:nth-child(4),.tbl th:nth-child(5),.tbl td:nth-child(5){display:none}.datefield{grid-template-columns:1fr}}
+</style>
+</head>
+<body>
+<div id="app"></div>
+<script>
+// ===================== CONSTANTS & STATE =====================
+const CFG="voinov_cfg3", TK="voinov2026clinic";
+const KEYS={patients:"A1",schedule:"B1",users:"C1",services:"D1"};
+
+let S={apiUrl:"",session:null,patients:[],schedule:{},users:[],services:[],sync:"ok",loading:false};
+
+function loadCfg(){
+  try{const c=JSON.parse(localStorage.getItem(CFG)||"{}");S.apiUrl=c.apiUrl||"";S.session=c.session||null;}catch{}
+}
+function saveCfg(){
+  localStorage.setItem(CFG,JSON.stringify({apiUrl:S.apiUrl,session:S.session}));
+}
+function cacheGet(k){try{const v=localStorage.getItem("vc_"+k);return v?JSON.parse(v):null;}catch{return null;}}
+function cacheSet(k,v){try{localStorage.setItem("vc_"+k,JSON.stringify(v));}catch{}}
+
+// ===================== CRYPTO =====================
+async function hashPw(pw){
+  const buf=await crypto.subtle.digest("SHA-256",new TextEncoder().encode(pw+TK));
+  return Array.from(new Uint8Array(buf)).map(b=>b.toString(16).padStart(2,"0")).join("");
+}
+
+// ===================== API =====================
+async function apiGet(key){
+  const r=await fetch(S.apiUrl+"?key="+key,{redirect:"follow"});
+  if(!r.ok)throw new Error(r.status);
+  const t=await r.text();return t?JSON.parse(t):null;
+}
+function apiPost(key,value){
+  if(!S.apiUrl)return;
+  fetch(S.apiUrl,{method:"POST",headers:{"Content-Type":"text/plain"},body:JSON.stringify({token:TK,key,value:JSON.stringify(value)})}).catch(()=>{});
+}
+
+async function apiSend(key,value){
+  if(!S.apiUrl)return{ok:false};
+  try{const r=await fetch(S.apiUrl,{method:"POST",headers:{"Content-Type":"text/plain"},body:JSON.stringify({token:TK,key,value:JSON.stringify(value)})});const t=await r.text();return t?JSON.parse(t):{ok:true};}
+  catch{return{ok:false};}
+}
+let saveTimer=null;
+let _pendingKeys=new Set();
+function triggerSave(keys){
+  S.sync="saving";updateSyncBars();
+  keys.forEach(k=>_pendingKeys.add(k));
+  if(keys.includes("patients"))cacheSet("patients",S.patients);
+  if(keys.includes("schedule"))cacheSet("schedule",S.schedule);
+  if(keys.includes("users"))cacheSet("users",S.users);
+  if(keys.includes("services"))cacheSet("services",S.services);
+  // Users and services: save immediately (no debounce) to avoid race on reload
+  if(keys.includes("users"))apiPost("users",S.users);
+  if(keys.includes("services"))apiPost("services",S.services);
+  // Patients and schedule: debounced
+  clearTimeout(saveTimer);
+  saveTimer=setTimeout(()=>{
+    if(_pendingKeys.has("patients"))apiPost("patients",S.patients);
+    if(_pendingKeys.has("schedule"))apiPost("schedule",S.schedule);
+    _pendingKeys.clear();
+    setTimeout(()=>{S.sync="ok";updateSyncBars();},1000);
+  },2000);
+}
+function updateSyncBars(){
+  const lbl={ok:"✓ Синхронизировано",saving:"⏳ Сохранение...",err:"⚠️ Данные в кэше"};
+  document.querySelectorAll(".syncbar").forEach(b=>{
+    b.className="syncbar "+S.sync;
+    const s=b.querySelector(".synclbl");if(s)s.textContent=lbl[S.sync]||"";
+  });
+}
+async function loadData(){
+  if(!S.apiUrl)return;
+  ["patients","schedule","users","services"].forEach(k=>{const c=cacheGet(k);if(c){if(k==="patients")S.patients=c;else if(k==="schedule")S.schedule=migrateSchedule(c);else if(k==="users")S.users=c;else if(k==="services")S.services=c;}});
+  try{
+    const[p,s,u,sv]=await Promise.all([apiGet("patients"),apiGet("schedule"),apiGet("users"),apiGet("services")]);
+    if(Array.isArray(p))S.patients=p;
+    if(s&&typeof s==="object")S.schedule=migrateSchedule(s);
+    // Only overwrite users/services from API if no pending local save
+    if(Array.isArray(u)&&!_pendingKeys.has("users"))S.users=u;
+    if(Array.isArray(sv)&&!_pendingKeys.has("services"))S.services=sv;
+    cacheSet("patients",S.patients);cacheSet("schedule",S.schedule);cacheSet("users",S.users);cacheSet("services",S.services);
+    S.sync="ok";
+  }catch{S.sync="err";}
+}
+function migrateSchedule(sch){
+  const m={};
+  Object.entries(sch).forEach(([d,v])=>{
+    if(Array.isArray(v))m[d]={blocks:[],slots:v.map(s=>({id:s.id||uid(),time:s.time,endTime:s.endTime||"",available:s.available,patientId:s.patientId||null,patientName:s.patientName||null,serviceId:null,serviceName:s.serviceName||null,serviceDuration:30,clinic:s.clinic||""}))};
+    else m[d]=v;
+  });
+  return m;
+}
+
+// ===================== UTILS =====================
+const uid=()=>Date.now().toString(36)+Math.random().toString(36).slice(2,6);
+const today=()=>new Date().toISOString().split("T")[0];
+const parseDate=s=>{if(!s)return null;const d=new Date(/^\d{4}-\d{2}-\d{2}$/.test(s)?s+"T12:00:00":s);return isNaN(d.getTime())?null:d;};
+const fmtD=s=>{const d=parseDate(s);return d?d.toLocaleDateString("ru-RU",{day:"numeric",month:"short"}):"—";};
+const fmtF=s=>{const d=parseDate(s);return d?d.toLocaleDateString("ru-RU",{day:"numeric",month:"long",year:"numeric"}):"—";};
+function calcAge(bd){if(!bd)return null;const b=new Date(bd),n=new Date();let a=n.getFullYear()-b.getFullYear();if(n.getMonth()<b.getMonth()||(n.getMonth()===b.getMonth()&&n.getDate()<b.getDate()))a--;return a>=0?a:null;}
+function ageLabel(bd){const a=calcAge(bd);if(a===null)return"—";const s=a%10===1&&a%100!==11?"год":a%10>=2&&a%10<=4&&(a%100<10||a%100>=20)?"года":"лет";return a+" "+s;}
+
+const ST={new:{l:"Новый",c:"#64748B"},scheduled:{l:"Записан",c:"#2563EB"},consulted:{l:"Принят",c:"#7C3AED"},preop:{l:"Ждёт операции",c:"#D97706"},operated:{l:"Прооперирован",c:"#059669"},followup:{l:"Наблюдение",c:"#0891B2"},completed:{l:"Завершён",c:"#94A3B8"}};
+const CT={callback:"Перезвонить",confirm:"Подтвердить запись",postop:"После операции",postvisit:"После приёма",schedule:"Записать на приём",review:"Попросить отзыв"};
+const SRC={instagram:"Instagram",telegram:"Telegram",site:"Сайт",yandex:"Яндекс",referral:"Направление",repeat:"Повторный",other:"Другое"};
+const CLINICS=["Реал Клиник","Н-клиник","Акфа Ташкент"];
+const ROLES={admin:"Администратор",doctor:"Врач",assistant:"Ассистент",web:"Команда сайта"};
+
+function autoStatus(p){
+  if(p.status==="completed")return"completed";
+  if(p.opDate||p.opDateText){if(["new","scheduled","consulted"].includes(p.status))return"preop";}
+  if(p.outcome&&["new","scheduled"].includes(p.status))return"consulted";
+  return p.status;
+}
+function generateSlots(block){
+  const slots=[];
+  let [h,m]=block.fromTime.split(":").map(Number);
+  const [eh,em]=block.toTime.split(":").map(Number);
+  const end=eh*60+em,dur=block.slotDuration||30;
+  while(h*60+m+dur<=end){
+    const t=String(h).padStart(2,"0")+":"+String(m).padStart(2,"0");
+    const em2=h*60+m+dur,eh2=Math.floor(em2/60),em2r=em2%60;
+    const et=String(eh2).padStart(2,"0")+":"+String(em2r).padStart(2,"0");
+    slots.push({id:uid(),time:t,endTime:et,available:true,patientId:null,patientName:null,serviceId:null,serviceName:null,serviceDuration:dur,clinic:block.clinic||""});
+    m+=dur;h+=Math.floor(m/60);m=m%60;
+  }
+  return slots;
+}
+function mergeSlots(existing,newSlots){
+  // Keep ALL existing slots (available and booked), add new ones that don't conflict
+  const times=new Set(existing.map(s=>s.time));
+  const toAdd=newSlots.filter(s=>!times.has(s.time));
+  return [...existing,...toAdd].sort((a,b)=>a.time.localeCompare(b.time));
+}
+function getMonday(ds){
+  const d=new Date(ds+"T12:00:00");const day=d.getDay();
+  d.setDate(d.getDate()+(day===0?-6:1-day));
+  return d.toISOString().split("T")[0];
+}
+function copyScheduleByWeek(srcDate,tFrom,tTo){
+  const srcMon=getMonday(srcDate);
+  const srcByDow={};
+  for(let i=0;i<7;i++){const d=new Date(srcMon+"T12:00:00");d.setDate(d.getDate()+i);const ds=d.toISOString().split("T")[0];const dow=d.getDay();if(dow!==0&&dow!==6)srcByDow[dow]=S.schedule[ds]||{blocks:[],slots:[]};}
+  const ns={...S.schedule};let count=0;
+  const cur=new Date(tFrom+"T12:00:00");const end=new Date(tTo+"T12:00:00");
+  while(cur<=end){
+    const dow=cur.getDay();const ds=cur.toISOString().split("T")[0];
+    if(dow!==0&&dow!==6&&srcByDow[dow]?.blocks?.length){
+      const src=srcByDow[dow];
+      const newBlocks=src.blocks.map(b=>({...b,id:uid()}));
+      let newSlots=[];newBlocks.forEach(b=>newSlots=[...newSlots,...generateSlots(b)]);
+      const merged=mergeSlots(ns[ds]?.slots||[],newSlots);
+      ns[ds]={blocks:newBlocks,slots:merged};count++;
+    }
+    cur.setDate(cur.getDate()+1);
+  }
+  S.schedule=ns;triggerSave(["schedule"]);return count;
+}
+
+// ===================== DOM HELPER =====================
+let SCR={tab:"today",sub:null,schDate:null,editId:null,dview:"dashboard"};
+function h(tag,a,...kids){
+  const el=document.createElement(tag);
+  if(a)Object.entries(a).forEach(([k,v])=>{
+    if(k==="cls")el.className=v;
+    else if(k.startsWith("on")&&typeof v==="function")el.addEventListener(k.slice(2).toLowerCase(),v);
+    else if(k==="sty"&&typeof v==="object")Object.assign(el.style,v);
+    else if(k==="disabled")el.disabled=v;
+    else el.setAttribute(k,v);
+  });
+  kids.flat(9).forEach(c=>{if(c==null||c===false)return;el.appendChild(typeof c==="string"||typeof c==="number"?document.createTextNode(String(c)):c);});
+  return el;
+}
+function mkSyncBar(){
+  const lbl={ok:"✓ Синхронизировано",saving:"⏳ Сохранение...",err:"⚠️ Данные в кэше"};
+  return h("div",{cls:"syncbar "+S.sync},h("span",{cls:"synclbl"},lbl[S.sync]),h("button",{onclick:()=>loadData().then(render)},"🔄"));
+}
+function renderApp(){
+  const app=document.getElementById("app");app.innerHTML="";
+  if(!S.apiUrl){app.appendChild(renderSetup());return;}
+  if(!S.session){app.appendChild(renderLogin());return;}
+  const role=S.session.role;
+  if(role==="admin"||role==="doctor")app.appendChild(renderDoctor());
+  else if(role==="assistant")app.appendChild(renderAssistant());
+  else app.appendChild(renderWeb());
+}
+const render=renderApp;
+
+// ===================== SETUP =====================
+function renderSetup(){
+  const inp=h("input",{cls:"fi",type:"url",placeholder:"https://script.google.com/macros/s/.../exec"});
+  const err=h("div",{sty:{color:"#DC2626",fontSize:13,marginBottom:12,display:"none"}});
+  const btn=h("button",{cls:"btn bp bw",onclick:async()=>{
+    const url=inp.value.trim();if(!url)return;
+    btn.disabled=true;btn.textContent="Проверяем...";err.style.display="none";
+    try{const r=await fetch(url+"?key=patients",{redirect:"follow"});if(r.ok){S.apiUrl=url;saveCfg();await loadData();render();}else throw new Error();}
+    catch{err.style.display="block";err.textContent="Не удалось подключиться. Проверьте URL.";btn.disabled=false;btn.textContent="Подключить";}
+  }},"Подключить");
+  return h("div",{cls:"login-wrap"},h("div",{cls:"setup-box"},
+    h("div",{sty:{fontSize:40,marginBottom:12}},"🔗"),
+    h("div",{sty:{fontSize:22,fontWeight:800,marginBottom:8}},"Подключение к базе данных"),
+    h("div",{sty:{fontSize:14,color:"#6B7280",marginBottom:20,lineHeight:1.6}},"Введите URL Google Apps Script. Приложение работает на любом устройстве независимо."),
+    h("div",{cls:"fg"},h("label",{cls:"fl"},"URL Apps Script"),inp),err,btn,
+    h("div",{cls:"instr",sty:{background:"#fff",borderRadius:12,padding:16,border:"1px solid var(--bd)",fontSize:13,lineHeight:2,marginTop:20}},
+      h("b",{},"📋 Как настроить:"),h("br"),
+      "1. Google Drive → «Клиника Доктор Войнов»",h("br"),
+      "2. Расширения → Apps Script",h("br"),
+      "3. Вставьте код из apps-script.js → Сохранить",h("br"),
+      "4. Развернуть → Новое → Веб-приложение → Доступ: Все",h("br"),
+      "5. Скопируйте URL и вставьте выше"
+    )
+  ));
+}
+
+// ===================== AUTH =====================
+function renderLogin(){
+  const emailI=h("input",{cls:"fi",type:"email",placeholder:"your@email.com",sty:{marginBottom:12}});
+  const pwI=h("input",{cls:"fi",type:"password",placeholder:"Пароль",sty:{marginBottom:12}});
+  const err=h("div",{sty:{color:"#DC2626",fontSize:13,marginBottom:12,display:"none",lineHeight:1.5}});
+  const btn=h("button",{cls:"btn bp bw",onclick:async()=>{
+    const email=emailI.value.trim().toLowerCase(),pw=pwI.value;
+    if(!email||!pw){err.style.display="block";err.textContent="Введите логин и пароль";return;}
+    btn.disabled=true;btn.textContent="Вход...";err.style.display="none";
+    const user=S.users.find(u=>u.email.toLowerCase()===email&&u.active!==false);
+    if(!user){err.style.display="block";err.textContent="Пользователь не найден или доступ закрыт";btn.disabled=false;btn.textContent="Войти";return;}
+    if(!user.passwordHash){err.style.display="block";err.textContent="Пароль ещё не установлен. Обратитесь к администратору.";btn.disabled=false;btn.textContent="Войти";return;}
+    const hash=await hashPw(pw);
+    if(hash!==user.passwordHash){err.style.display="block";err.textContent="Неверный пароль";btn.disabled=false;btn.textContent="Войти";return;}
+    S.session={userId:user.id,email:user.email,name:user.name,role:user.role};saveCfg();render();
+  }},"Войти");
+  // First run — no users at all
+  const isFirstRun=S.users.length===0;
+  if(isFirstRun){
+    btn.onclick=async()=>{
+      const email=emailI.value.trim().toLowerCase(),pw=pwI.value;
+      if(!email||!pw||pw.length<4){err.style.display="block";err.textContent="Введите логин и пароль (мин. 4 символа)";return;}
+      btn.disabled=true;btn.textContent="Создаём...";
+      const hash=await hashPw(pw);
+      const newUser={id:uid(),email,name:"Администратор",role:"admin",passwordHash:hash,active:true,createdAt:new Date().toISOString()};
+      S.users=[newUser];cacheSet("users",S.users);apiPost("users",S.users);
+      S.session={userId:newUser.id,email:newUser.email,name:newUser.name,role:newUser.role};saveCfg();render();
+    };
+    btn.textContent="Создать администратора";
+  }
+  return h("div",{cls:"login-wrap"},h("div",{cls:"login-box"},
+    h("div",{sty:{fontSize:40,marginBottom:12}},"🩺"),
+    h("div",{sty:{fontSize:22,fontWeight:800,color:"var(--p)",marginBottom:4}},"Доктор Войнов"),
+    h("div",{sty:{fontSize:13,color:"var(--mu)",marginBottom:28}},"doctorvoinov.ru"),
+    h("div",{cls:"fg"},h("label",{cls:"fl"},"Логин (email)"),emailI),
+    h("div",{cls:"fg"},h("label",{cls:"fl"},"Пароль"),pwI),
+    err,btn,
+    isFirstRun?h("div",{cls:"alert alert-warn",sty:{marginTop:16}},"Первый запуск. Введите любой email и придумайте пароль — будет создан аккаунт администратора."):null,
+    h("button",{onclick:()=>{S.apiUrl="";saveCfg();render();},sty:{marginTop:20,background:"none",border:"none",color:"var(--hi)",fontSize:12,cursor:"pointer",fontFamily:"inherit",display:"block"}},"Изменить подключение")
+  ));
+}
+
+// Change password screen — accessible from profile
+function renderChangePassword(user,onBack){
+  const pw0=h("input",{cls:"fi",type:"password",placeholder:"Текущий пароль"});
+  const pw1=h("input",{cls:"fi",type:"password",placeholder:"Новый пароль"});
+  const pw2=h("input",{cls:"fi",type:"password",placeholder:"Повторите новый пароль"});
+  const err=h("div",{sty:{color:"#DC2626",fontSize:13,marginBottom:12,display:"none"}});
+  const ok=h("div",{cls:"alert alert-ok",sty:{marginBottom:12,display:"none"}},"✓ Пароль успешно изменён");
+  const btn=h("button",{cls:"btn bp bw",onclick:async()=>{
+    err.style.display="none";ok.style.display="none";
+    if(!pw1.value||pw1.value.length<4){err.style.display="block";err.textContent="Новый пароль — минимум 4 символа";return;}
+    if(pw1.value!==pw2.value){err.style.display="block";err.textContent="Пароли не совпадают";return;}
+    const h0=await hashPw(pw0.value);
+    if(h0!==user.passwordHash){err.style.display="block";err.textContent="Текущий пароль неверен";return;}
+    const hash=await hashPw(pw1.value);
+    S.users=S.users.map(u=>u.id===user.id?{...u,passwordHash:hash}:u);
+    // Update session with new hash reflected
+    const updUser=S.users.find(u=>u.id===user.id);
+    triggerSave(["users"]);
+    ok.style.display="block";
+    pw0.value="";pw1.value="";pw2.value="";
+    setTimeout(()=>{ok.style.display="none";},3000);
+  }},"Изменить пароль");
+  const wrap=h("div",{sty:{maxWidth:400}},
+    h("button",{cls:"bbk",onclick:onBack},"← Назад"),
+    h("div",{sty:{fontSize:18,fontWeight:800,marginBottom:4}},"Смена пароля"),
+    h("div",{sty:{fontSize:13,color:"var(--mu)",marginBottom:20}},user.name+" · "+user.email),
+    h("div",{cls:"fg"},h("label",{cls:"fl"},"Текущий пароль"),pw0),
+    h("div",{cls:"fg"},h("label",{cls:"fl"},"Новый пароль"),pw1),
+    h("div",{cls:"fg"},h("label",{cls:"fl"},"Повторите"),pw2),
+    ok,err,btn
+  );
+  return wrap;
+}
+
+// ===================== SHARED COMPONENTS =====================
+function patCard(p,onClick){
+  const s=ST[p.status];
+  return h("div",{cls:"crow",onclick:onClick},
+    h("div",{cls:"av"},(p.name||"?")[0]),
+    h("div",{sty:{flex:1}},
+      h("div",{sty:{fontWeight:700,fontSize:14}},p.name),
+      h("div",{sty:{fontSize:12,color:"var(--mu)"}},"📞 "+p.phone+(p.birthDate?" · "+ageLabel(p.birthDate):"")),
+      h("span",{cls:"tag",sty:{display:"inline-block",marginTop:3,background:(s?.c||"#ccc")+"22",color:s?.c||"#666"}},s?.l||p.status)
+    ),h("span",{sty:{color:"var(--mu)",fontSize:20}},"›")
+  );
+}
+
+// ===================== PATIENT DETAIL =====================
+function renderPatDetail(p,role,onBack){
+  if(!p)return h("div",{},"Пациент не найден");
+  let curTab=SCR.openTaskId?"tasks":"info";
+  const tbEl=h("div",{cls:"tabs"});
+  const cEl=h("div",{});
+  const activeCnt=(p.tasks||[]).filter(t=>!t.completed).length;
+  const tabs=role==="web"?[["info","Инфо"]]:[["info","Инфо"],["tasks","Задачи"+(activeCnt>0?" ("+activeCnt+")":"")],["notes","Заметки"],["edit","Редактировать"]];
+  function drawTab(t){
+    curTab=t||curTab;
+    cEl.innerHTML="";
+    tbEl.querySelectorAll(".tb").forEach(b=>b.className="tb "+(b.dataset.t===curTab?"on":"off"));
+    const pp=S.patients.find(x=>x.id===p.id)||p;
+    if(curTab==="info")cEl.appendChild(patInfo(pp,role));
+    else if(curTab==="tasks")cEl.appendChild(patTasksWrap(pp,role));
+    else if(curTab==="notes")cEl.appendChild(patNotes(pp,role));
+    else cEl.appendChild(patEditForm(pp,role,()=>drawTab("info")));
+  }
+  tabs.forEach(([t,l])=>{const b=h("button",{cls:"tb "+(t===curTab?"on":"off")},l);b.dataset.t=t;b.onclick=()=>drawTab(t);tbEl.appendChild(b);});
+  drawTab();
+  return h("div",{},
+    h("button",{cls:"bbk",onclick:onBack},"← Назад"),
+    h("div",{sty:{display:"flex",alignItems:"center",gap:12,marginBottom:12}},
+      h("div",{cls:"av",sty:{width:50,height:50,fontSize:20}},(p.name||"?")[0]),
+      h("div",{sty:{flex:1}},
+        h("div",{sty:{fontSize:18,fontWeight:800}},p.name),
+        h("div",{sty:{fontSize:13,color:"var(--mu)"}},"📞 "+p.phone+(p.birthDate?" · "+ageLabel(p.birthDate):""))
+      )
+    ),
+    role!=="web"?h("button",{cls:"btn bp bw",sty:{marginBottom:12},onclick:()=>showBookingModal(p)},"📅 Записать на приём"):null,
+    tbEl,cEl
+  );
+}
+
+function patInfo(p,role){
+  const s=ST[p.status];
+  const statusSel=h("select",{cls:"fi",sty:{marginBottom:12}});
+  Object.entries(ST).forEach(([k,v])=>{const o=h("option",{value:k},v.l);if(k===p.status)o.selected=true;statusSel.appendChild(o);});
+  statusSel.onchange=async e=>{await savePats(S.patients.map(pr=>pr.id!==p.id?pr:{...pr,status:e.target.value}),true);};
+  const rows=[
+    p.birthDate&&["Дата рождения",fmtD(p.birthDate)+(p.birthDate?" ("+ageLabel(p.birthDate)+")":"")],
+    ["Источник",SRC[p.source]||p.source||"—"],
+    ["Добавлен",fmtD(p.createdAt)],
+    p.complaint&&["Жалоба",p.complaint],
+    p.outcome&&["Итог приёма",p.outcome],
+    (p.opDate||p.opDateText)&&["Операция",p.opDate?fmtD(p.opDate):p.opDateText],
+    p.opPrice&&["Стоимость",Number(p.opPrice).toLocaleString("ru-RU")+" ₽"],
+    (p.nextAppointment||p.nextAppointmentText)&&["Следующий приём",p.nextAppointment?fmtD(p.nextAppointment):p.nextAppointmentText],
+    p.nextContact&&["Контакт ассистента",fmtD(p.nextContact)],
+    p.doctorNote&&["Заметка врача",p.doctorNote],
+  ].filter(Boolean);
+  return h("div",{cls:"card"},
+    h("label",{cls:"fl"},"Статус"),statusSel,
+    ...rows.map(([k,v])=>h("div",{cls:"ir"},h("span",{cls:"ik"},k),h("span",{cls:"iv"},v)))
+  );
+}
+
+// TASKS — FIXED: no parent re-renders, expand/collapse per task
+function patTasksWrap(p,role){
+  const wrap=h("div",{});
+  rebuildTasks(wrap,p,role);
+  return wrap;
+}
+function rebuildTasks(wrap,p,role){
+  wrap.innerHTML="";
+  const pp=S.patients.find(x=>x.id===p.id)||p;
+  const active=(pp.tasks||[]).filter(t=>!t.completed);
+  const done=(pp.tasks||[]).filter(t=>t.completed);
+  if(!active.length)wrap.appendChild(h("div",{cls:"emp",sty:{padding:"20px 0"}},h("div",{},"Нет активных задач")));
+  active.forEach(t=>wrap.appendChild(makeTaskEl(t,pp,role,wrap)));
+  // Add task
+  let showF=false;
+  const showB=h("button",{cls:"btn bs bw",sty:{marginTop:8},onclick:()=>{showF=true;rebForm();}},"+  Добавить задачу");
+  const form=h("div",{cls:"card",sty:{marginTop:8,display:"none"}});
+  const ts=h("select",{cls:"fi"});Object.entries(CT).forEach(([k,v])=>ts.appendChild(h("option",{value:k},v)));
+  const di=h("input",{cls:"fi",type:"date",value:today()});
+  const desc=h("textarea",{cls:"fi",sty:{minHeight:56},placeholder:"Комментарий..."});
+  form.appendChild(h("div",{cls:"fg"},h("label",{cls:"fl"},"Тип"),ts));
+  form.appendChild(h("div",{cls:"fg"},h("label",{cls:"fl"},"Дата"),di));
+  form.appendChild(h("div",{cls:"fg"},h("label",{cls:"fl"},"Комментарий"),desc));
+  form.appendChild(h("div",{sty:{display:"flex",gap:8}},
+    h("button",{cls:"btn bp",sty:{flex:1},onclick:async()=>{
+      const newTask={id:uid(),type:ts.value,dueDate:di.value,description:desc.value,completed:false,createdAt:new Date().toISOString()};
+      await savePats(S.patients.map(pr=>pr.id!==pp.id?pr:{...pr,tasks:[...(pr.tasks||[]),newTask]}),true);
+      rebuildTasks(wrap,S.patients.find(x=>x.id===pp.id),role);
+    }},"Создать задачу"),
+    h("button",{cls:"btn bs",onclick:()=>{showF=false;rebForm();}},"Отмена")
+  ));
+  function rebForm(){showB.style.display=showF?"none":"flex";form.style.display=showF?"block":"none";}
+  wrap.appendChild(showB);wrap.appendChild(form);
+  if(done.length){
+    wrap.appendChild(h("div",{cls:"st",sty:{marginTop:12}},"Выполненные — "+done.length));
+    done.forEach(t=>wrap.appendChild(h("div",{sty:{fontSize:13,color:"var(--mu)",padding:"6px 0",borderBottom:"1px solid var(--bd)",textDecoration:"line-through"}},CT[t.type]+" · "+fmtD(t.completedAt))));
+  }
+}
+function makeTaskEl(t,p,role,wrap){
+  const isUrg=t.dueDate<today();
+  const el=h("div",{cls:"task-item"});
+  if(isUrg)el.style.borderLeft="3px solid var(--r)";
+  let expanded=false;
+  const arrow=h("span",{sty:{color:"var(--mu)",fontSize:16,transition:"transform .15s",display:"inline-block"}},"›");
+  const hdr=h("div",{cls:"task-hdr"},
+    arrow,
+    h("div",{sty:{flex:1}},
+      h("div",{sty:{fontWeight:700,fontSize:14}},CT[t.type]||t.type),
+      t.description?h("div",{sty:{fontSize:12,color:"var(--tx)",marginTop:1}},t.description):null,
+      h("div",{sty:{fontSize:11,color:isUrg?"var(--r)":"var(--mu)",marginTop:2}},"📅 "+fmtD(t.dueDate))
+    ),
+    h("button",{cls:"task-done-btn",onclick:async e=>{
+      e.stopPropagation();
+      await savePats(S.patients.map(pr=>pr.id!==p.id?pr:{...pr,tasks:(pr.tasks||[]).map(tk=>tk.id!==t.id?tk:{...tk,completed:true,completedAt:new Date().toISOString()})}),true);
+      rebuildTasks(wrap,S.patients.find(x=>x.id===p.id),role);
+    }},"✓ Готово")
+  );
+  hdr.addEventListener("click",e=>{if(e.target.classList.contains("task-done-btn"))return;expanded=!expanded;body.style.display=expanded?"block":"none";arrow.style.transform=expanded?"rotate(90deg)":"";});
+  const commentTA=h("textarea",{cls:"fi",sty:{minHeight:60,marginBottom:8,fontSize:14},placeholder:"Комментарий к звонку..."});
+  commentTA.value=t.comment||"";
+  const statusSel=h("select",{cls:"fi",sty:{marginBottom:8}});
+  Object.entries(ST).forEach(([k,v])=>{const o=h("option",{value:k},v.l);if(k===p.status)o.selected=true;statusSel.appendChild(o);});
+  const body=h("div",{cls:"task-body"},
+    h("div",{cls:"fg"},h("label",{cls:"fl"},"Комментарий"),commentTA),
+    h("div",{cls:"fg"},h("label",{cls:"fl"},"Статус пациента"),statusSel),
+    h("div",{sty:{display:"flex",gap:8}},
+      h("button",{cls:"btn bp",sty:{flex:1},onclick:async()=>{
+        await savePats(S.patients.map(pr=>pr.id!==p.id?pr:{...pr,status:statusSel.value,tasks:(pr.tasks||[]).map(tk=>tk.id!==t.id?tk:{...tk,comment:commentTA.value})}),true);
+        rebuildTasks(wrap,S.patients.find(x=>x.id===p.id),role);
+      }},"Сохранить"),
+      h("button",{cls:"btn bs",onclick:async()=>{
+        await savePats(S.patients.map(pr=>pr.id!==p.id?pr:{...pr,tasks:(pr.tasks||[]).map(tk=>tk.id!==t.id?tk:{...tk,completed:true,comment:commentTA.value,completedAt:new Date().toISOString()})}),true);
+        rebuildTasks(wrap,S.patients.find(x=>x.id===p.id),role);
+      }},"✓ Выполнено")
+    )
+  );
+  // Auto-expand if this is the task navigated from today tab
+  if(SCR.openTaskId&&t.id===SCR.openTaskId){
+    expanded=true;body.style.display="block";arrow.style.transform="rotate(90deg)";
+    setTimeout(()=>{el.scrollIntoView({behavior:"smooth",block:"center"});SCR.openTaskId=null;},200);
+  }
+  el.appendChild(hdr);el.appendChild(body);
+  return el;
+}
+
+function patNotes(p,role){
+  const wrap=h("div",{});
+  const notes=[...(p.notes||[])].reverse();
+  if(!notes.length)wrap.appendChild(h("div",{cls:"emp",sty:{padding:"20px 0"}},h("div",{},"Нет заметок")));
+  notes.forEach(n=>wrap.appendChild(h("div",{cls:"card",sty:{marginBottom:8}},h("div",{sty:{fontSize:13}},n.text),h("div",{sty:{fontSize:11,color:"var(--mu)",marginTop:4}},fmtF(n.createdAt)+" · "+(n.author||"")))));
+  const ta=h("textarea",{cls:"fi",placeholder:"Добавить заметку...",sty:{marginBottom:8}});
+  wrap.appendChild(h("div",{sty:{marginTop:8}},ta,h("button",{cls:"btn bp bw",onclick:async()=>{
+    if(!ta.value.trim())return;
+    await savePats(S.patients.map(pr=>pr.id!==p.id?pr:{...pr,notes:[...(pr.notes||[]),{id:uid(),text:ta.value,createdAt:new Date().toISOString(),author:S.session?.name||S.session?.role||""}]}),true);
+    ta.value="";
+    const w=wrap.parentNode;if(w){w.innerHTML="";w.appendChild(patNotes(S.patients.find(x=>x.id===p.id),role));}
+  }},"Сохранить")));
+  return wrap;
+}
+
+function patEditForm(p,role,onSaved){
+  const f={...p};
+  function fi(k,attrs={}){
+    let el;
+    if(attrs.tag==="textarea"){el=h("textarea",{cls:"fi",...attrs});el.textContent=f[k]||"";}
+    else if(attrs.tag==="select"){el=h("select",{cls:"fi"});Object.entries(ST).forEach(([k2,v])=>{const o=h("option",{value:k2},v.l);if(k2===f[k])o.selected=true;el.appendChild(o);});el.value=f[k]||"new";}
+    else{el=h("input",{cls:"fi",...attrs,value:f[k]||""});}
+    el.addEventListener("input",e=>f[k]=e.target.value);
+    return el;
+  }
+  function datePair(key,textKey,label){
+    const dI=h("input",{cls:"fi",type:"date",value:f[key]||""});
+    const tI=h("input",{cls:"fi",type:"text",placeholder:"или текстом: «начало мая»",value:f[textKey]||""});
+    dI.oninput=e=>f[key]=e.target.value;tI.oninput=e=>f[textKey]=e.target.value;
+    return h("div",{cls:"fg"},h("label",{cls:"fl"},label),h("div",{cls:"datefield"},dI,tI));
+  }
+  const ageD=h("div",{sty:{fontSize:12,color:"var(--mu)",marginTop:4}},f.birthDate?"Возраст: "+ageLabel(f.birthDate):"");
+  const bdI=h("input",{cls:"fi",type:"date",value:f.birthDate||""});
+  bdI.oninput=e=>{f.birthDate=e.target.value;ageD.textContent=f.birthDate?"Возраст: "+ageLabel(f.birthDate):"";};
+  const saveBtn=h("div",{sty:{display:"flex",gap:8}},
+    h("button",{cls:"btn bp",sty:{flex:1},onclick:async()=>{f.status=autoStatus(f);await savePats(S.patients.map(pr=>pr.id===f.id?f:pr),true);onSaved&&onSaved();}},"Сохранить"),
+    h("button",{cls:"btn bs",onclick:()=>onSaved&&onSaved()},"Отмена")
+  );
+  // Doctor sees simplified clinical form only
+  if(role==="doctor"){
+    return h("div",{},
+      h("div",{cls:"alert alert-warn",sty:{marginBottom:14}},"Кабинет врача: результат приёма. Полное редактирование — у ассистента."),
+      h("div",{cls:"fg"},h("label",{cls:"fl"},"Статус"),fi("status",{tag:"select"})),
+      h("div",{cls:"fg"},h("label",{cls:"fl"},"Итог приёма / Диагноз"),fi("outcome",{tag:"textarea",placeholder:"Назначения, диагноз, рекомендации..."})),
+      datePair("opDate","opDateText","Дата операции"),
+      h("div",{cls:"fg"},h("label",{cls:"fl"},"Стоимость (₽)"),fi("opPrice",{type:"number",placeholder:"0"})),
+      datePair("nextAppointment","nextAppointmentText","Следующий приём"),
+      h("div",{cls:"fg"},h("label",{cls:"fl"},"Дата контакта (ассистент)"),fi("nextContact",{type:"date"})),
+      h("div",{cls:"fg"},h("label",{cls:"fl"},"Заметка врача"),fi("doctorNote",{tag:"textarea",placeholder:"Видна только врачу..."})),
+      saveBtn
+    );
+  }
+  // Source select helper for full form
+  const srcSel=h("select",{cls:"fi"});
+  Object.entries(SRC).forEach(([k,v])=>{const o=h("option",{value:k},v);if(k===f.source)o.selected=true;srcSel.appendChild(o);});
+  srcSel.onchange=e=>f.source=e.target.value;
+  // Assistant / admin: full form
+  return h("div",{},
+    h("div",{cls:"fg"},h("label",{cls:"fl"},"Статус"),fi("status",{tag:"select"})),
+    h("div",{cls:"fg"},h("label",{cls:"fl"},"Имя"),fi("name",{placeholder:"Имя пациента"})),
+    h("div",{cls:"fg"},h("label",{cls:"fl"},"Телефон"),fi("phone",{type:"tel"})),
+    h("div",{cls:"fg"},h("label",{cls:"fl"},"Дата рождения"),bdI,ageD),
+    h("div",{cls:"fg"},h("label",{cls:"fl"},"Источник"),srcSel),
+    h("div",{cls:"fg"},h("label",{cls:"fl"},"Жалоба"),fi("complaint",{tag:"textarea"})),
+    h("div",{cls:"fg"},h("label",{cls:"fl"},"Итог приёма / Диагноз"),fi("outcome",{tag:"textarea",placeholder:"Назначения, диагноз..."})),
+    datePair("opDate","opDateText","Дата операции"),
+    h("div",{cls:"fg"},h("label",{cls:"fl"},"Стоимость (₽)"),fi("opPrice",{type:"number",placeholder:"0"})),
+    datePair("nextAppointment","nextAppointmentText","Следующий приём"),
+    h("div",{cls:"fg"},h("label",{cls:"fl"},"Дата контакта (ассистент)"),fi("nextContact",{type:"date"})),
+    h("div",{cls:"fg"},h("label",{cls:"fl"},"Заметка врача"),fi("doctorNote",{tag:"textarea"})),
+    saveBtn
+  );
+}
+
+// ===================== BOOKING MODAL =====================
+function showBookingModal(p){
+  const wd=wDates(14);
+  let selDate=wd[0],selSlot=null,selSvc=null,customDur=null,showNewSvcFlag=false;
+  let overlay;
+  function close(){if(overlay&&overlay.parentNode)overlay.parentNode.removeChild(overlay);}
+  function build(){
+    if(overlay&&overlay.parentNode)overlay.parentNode.removeChild(overlay);
+    const nowHHMM=(()=>{const n=new Date();return String(n.getHours()).padStart(2,"0")+":"+String(n.getMinutes()).padStart(2,"0");})();
+    const slots=(S.schedule[selDate]?.slots||[]).filter(s=>s.available&&(selDate!==today()||s.time>nowHHMM));
+    const body=h("div",{cls:"modal"});
+    body.appendChild(h("div",{sty:{display:"flex",alignItems:"center",justifyContent:"space-between",marginBottom:16}},
+      h("div",{sty:{fontWeight:800,fontSize:18}},"Записать на приём"),
+      h("button",{cls:"hb",sty:{background:"var(--bg)",color:"var(--tx)"},onclick:close},"✕")
+    ));
+    body.appendChild(h("div",{sty:{fontWeight:600,marginBottom:12}},p.name));
+    // Date
+    body.appendChild(h("div",{cls:"fg"},h("label",{cls:"fl"},"Дата"),
+      h("div",{cls:"dr",sty:{marginBottom:0}}, ...wd.map(d=>{
+        const dd=new Date(d);const fr=(S.schedule[d]?.slots||[]).filter(s=>s.available).length;
+        const b=h("button",{cls:"dc"+(d===selDate?" on":""),onclick:()=>{selDate=d;selSlot=null;build();}},
+          h("span",{cls:"dsb"},dd.toLocaleDateString("ru-RU",{weekday:"short"})),dd.getDate(),
+          h("span",{cls:"dsb",sty:{color:d===selDate?"rgba(255,255,255,.75)":"var(--p)"}},fr+" св."));
+        return b;
+      }))
+    ));
+    // Slots
+    body.appendChild(h("div",{cls:"fg"},h("label",{cls:"fl"},"Время"),
+      slots.length?h("div",{sty:{display:"flex",flexWrap:"wrap"}}, ...slots.map(s=>{
+        const el=h("div",{cls:"slt fr"+(selSlot?.time===s.time?" ":" "),sty:{background:selSlot?.time===s.time?"var(--p)":"",color:selSlot?.time===s.time?"#fff":""}},
+          s.time,s.clinic?h("div",{cls:"slt-name"},s.clinic):null);
+        if(selSlot?.time===s.time){el.style.background="var(--p)";el.style.color="#fff";}
+        el.onclick=()=>{selSlot=s;build();};
+        return el;
+      })):h("div",{sty:{fontSize:13,color:"var(--mu)",padding:"10px 0"}},"Нет свободных слотов на эту дату")
+    ));
+    // Service
+    body.appendChild(h("div",{cls:"fg"},h("label",{cls:"fl"},"Услуга"),
+      h("select",{cls:"fi",onchange:e=>{
+        if(e.target.value==="__new__"){selSvc=null;showNewSvcFlag=true;build();}
+        else{selSvc=S.services.find(s=>s.id===e.target.value)||null;customDur=selSvc?.duration||null;showNewSvcFlag=false;build();}
+      }},
+        h("option",{value:""},"— Выберите услугу —"),
+        ...S.services.map(sv=>{const o=h("option",{value:sv.id},sv.name+(sv.price?" · "+Number(sv.price).toLocaleString("ru-RU")+" ₽":""));if(selSvc?.id===sv.id)o.selected=true;return o;}),
+        h("option",{value:"__new__",selected:showNewSvcFlag},"+ Создать новую услугу...")
+      )
+    ));
+    // New service inline form — show when no services or __new__ explicitly selected
+    if(S.services.length===0||showNewSvcFlag){
+      if(S.services.length===0)body.appendChild(h("div",{cls:"alert alert-warn",sty:{marginBottom:8}},"Нет услуг. Создайте первую:"));
+      const newSvcWrap=h("div",{cls:"card",sty:{marginBottom:12}});
+      const svcName=h("input",{cls:"fi",placeholder:"Название услуги *",sty:{marginBottom:8}});
+      const svcPrice=h("input",{cls:"fi",type:"number",placeholder:"Стоимость, ₽",sty:{marginBottom:8}});
+      const svcDur=h("input",{cls:"fi",type:"number",placeholder:"Длительность, мин",sty:{marginBottom:8}});
+      newSvcWrap.appendChild(h("div",{sty:{fontWeight:700,marginBottom:8}},"Новая услуга"));
+      newSvcWrap.appendChild(h("div",{sty:{display:"grid",gridTemplateColumns:"1fr 1fr",gap:8}},
+        h("div",{cls:"fg"},h("label",{cls:"fl"},"Название *"),svcName),
+        h("div",{cls:"fg"},h("label",{cls:"fl"},"Стоимость (₽)"),svcPrice)
+      ));
+      newSvcWrap.appendChild(h("div",{cls:"fg"},h("label",{cls:"fl"},"Длительность (мин)"),svcDur));
+      newSvcWrap.appendChild(h("button",{cls:"btn bp bsm",onclick:()=>{
+        if(!svcName.value.trim())return;
+        const sv={id:uid(),name:svcName.value.trim(),price:svcPrice.value||"",duration:parseInt(svcDur.value)||30};
+        S.services=[...S.services,sv];triggerSave(["services"]);
+        selSvc=sv;customDur=sv.duration;showNewSvcFlag=false;build();
+      }},"Создать и выбрать"));
+      body.appendChild(newSvcWrap);
+    }
+    // Duration override
+    if(selSvc){
+      const durI=h("input",{cls:"fi",type:"number",value:customDur||selSvc.duration||30,onchange:e=>customDur=parseInt(e.target.value)||30});
+      body.appendChild(h("div",{cls:"fg"},h("label",{cls:"fl"},"Длительность (мин)"),durI));
+    }
+    // Book button
+    const canBook=selSlot&&selSvc;
+    body.appendChild(h("button",{cls:"btn bp bw",disabled:!canBook,onclick:async()=>{
+      if(!selSlot||!selSvc)return;
+      const dur=customDur||selSvc.duration||30;
+      const upSlot={...selSlot,available:false,patientId:p.id,patientName:p.name,serviceId:selSvc.id,serviceName:selSvc.name,serviceDuration:dur};
+      const ns={...S.schedule,[selDate]:{...S.schedule[selDate],slots:(S.schedule[selDate]?.slots||[]).map(s=>s.id!==selSlot.id?s:upSlot)}};
+      const upPat=S.patients.map(pr=>pr.id!==p.id?pr:{...pr,status:pr.status==="new"?"scheduled":pr.status});
+      S.patients=upPat;S.schedule=ns;triggerSave(["patients","schedule"]);
+      close();render();
+    }},canBook?"Записать на "+selSlot.time+" · "+fmtD(selDate):"Выберите время и услугу"));
+    overlay=h("div",{cls:"overlay",onclick:e=>{if(e.target===overlay)close();}},body);
+    document.getElementById("app").appendChild(overlay);
+  }
+  build();
+}
+
+// ===================== SCHEDULE =====================
+function wDates(n){const r=[];for(let i=0;i<60;i++){const d=new Date();d.setDate(d.getDate()+i);if(d.getDay()!==0&&d.getDay()!==6)r.push(d.toISOString().split("T")[0]);if(r.length>=(n||14))break;}return r;}
+function getMonthDates(yr,mo){const r=[];const d=new Date(yr,mo,1);while(d.getMonth()===mo){if(d.getDay()!==0&&d.getDay()!==6)r.push(d.toISOString().split("T")[0]);d.setDate(d.getDate()+1);}return r;}
+
+function renderSchedule(role){
+  if(SCR.schYear===undefined){const n=new Date();SCR.schYear=n.getFullYear();SCR.schMonth=n.getMonth();}
+  if(!SCR.schDate)SCR.schDate=today();
+  const wrap=h("div",{});
+  wrap.appendChild(h("div",{sty:{fontSize:18,fontWeight:800,marginBottom:10}},"Расписание"));
+
+  // Month navigation
+  const monthLbl=h("span",{sty:{fontWeight:700,fontSize:15,flex:1,textAlign:"center"}});
+  const mnav=h("div",{sty:{display:"flex",alignItems:"center",gap:6,marginBottom:10}},
+    h("button",{cls:"btn bs bsm",onclick:()=>{SCR.schMonth--;if(SCR.schMonth<0){SCR.schMonth=11;SCR.schYear--;}rebAll();}},"←"),
+    monthLbl,
+    h("button",{cls:"btn bs bsm",onclick:()=>{SCR.schMonth++;if(SCR.schMonth>11){SCR.schMonth=0;SCR.schYear++;}rebAll();}},"→"),
+    h("button",{cls:"btn bs bsm",onclick:()=>{const n=new Date();SCR.schYear=n.getFullYear();SCR.schMonth=n.getMonth();SCR.schDate=today();rebAll();}},"Сегодня")
+  );
+  if(role!=="web"){
+    mnav.appendChild(h("button",{cls:"btn ba bsm",onclick:()=>showCopyModal()},"📋 Копировать"));
+  }
+  wrap.appendChild(mnav);
+  const calWrap=h("div",{sty:{marginBottom:12}});
+  const slWrap=h("div",{});
+  const detWrap=h("div",{});
+  const tdStr=today();
+
+  function rebDates(){
+    const yr=SCR.schYear,mo=SCR.schMonth;
+    monthLbl.textContent=new Date(yr,mo).toLocaleDateString("ru-RU",{month:"long",year:"numeric"});
+    // Auto-select closest future working day in this month
+    const allDays=getMonthDates(yr,mo);
+    if(allDays.length&&!allDays.includes(SCR.schDate)){
+      SCR.schDate=allDays.find(d=>d>=tdStr)||allDays[allDays.length-1];
+    }
+    calWrap.innerHTML="";
+    // Weekday headers
+    const hRow=h("div",{sty:{display:"grid",gridTemplateColumns:"repeat(7,1fr)",gap:3,marginBottom:4}});
+    ["Пн","Вт","Ср","Чт","Пт","Сб","Вс"].forEach(n=>
+      hRow.appendChild(h("div",{sty:{textAlign:"center",fontSize:10,fontWeight:700,color:"var(--mu)",padding:"2px 0"}},n))
+    );
+    calWrap.appendChild(hRow);
+    // Days grid
+    const grid=h("div",{sty:{display:"grid",gridTemplateColumns:"repeat(7,1fr)",gap:3}});
+    const firstDow=new Date(yr,mo,1).getDay();
+    const offset=firstDow===0?6:firstDow-1;
+    for(let i=0;i<offset;i++)grid.appendChild(h("div",{}));
+    const daysInMonth=new Date(yr,mo+1,0).getDate();
+    for(let day=1;day<=daysInMonth;day++){
+      const d=new Date(yr,mo,day);
+      const dow=d.getDay();
+      const isWknd=dow===0||dow===6;
+      const ds=d.toISOString().split("T")[0];
+      const isPast=ds<tdStr;
+      const isSel=ds===SCR.schDate;
+      const isTdy=ds===tdStr;
+      const slots=S.schedule[ds]?.slots||[];
+      const fr=slots.filter(s=>s.available).length;
+      const tot=slots.length;
+      const inactive=isWknd||isPast;
+      const cell=h("div",{sty:{
+        padding:"6px 2px",borderRadius:"8px",textAlign:"center",
+        cursor:inactive?"default":"pointer",
+        background:isSel?"var(--p)":isTdy?"var(--pll)":"",
+        opacity:inactive?"0.28":"1",
+        border:isTdy&&!isSel?"1.5px solid var(--p)":"1.5px solid transparent",
+        transition:"background .1s"
+      }},
+        h("div",{sty:{fontSize:13,fontWeight:700,color:isSel?"#fff":isPast?"var(--hi)":"var(--tx)"}},day),
+        h("div",{sty:{fontSize:9,fontWeight:600,color:isSel?"rgba(255,255,255,.7)":tot>0?"var(--p)":"transparent",marginTop:1}},tot>0?fr+"/"+tot:"·")
+      );
+      if(!inactive){cell.onclick=()=>{SCR.schDate=ds;rebSlots();};}
+      grid.appendChild(cell);
+    }
+    calWrap.appendChild(grid);
+  }
+
+  function rebSlots(){
+    rebDates();
+    slWrap.innerHTML="";detWrap.innerHTML="";
+    const day=S.schedule[SCR.schDate]||{blocks:[],slots:[]};
+    const slots=day.slots||[];
+    const fr=slots.filter(s=>s.available).length;
+    slWrap.appendChild(h("div",{sty:{fontSize:13,color:"var(--mu)",marginBottom:10}},fmtF(SCR.schDate)+" · "+fr+" св. / "+slots.length+" всего"));
+
+    if(role!=="web"){
+      const blks=day.blocks||[];
+      if(blks.length){
+        slWrap.appendChild(h("div",{cls:"st"},"Блоки работы"));
+        blks.forEach(blk=>{
+          slWrap.appendChild(h("div",{cls:"block-card"},
+            h("div",{},
+              h("b",{},blk.fromTime+" – "+blk.toTime),
+              h("div",{sty:{fontSize:12,color:"var(--mu)"}},(blk.clinic||"Клиника не указана")+" · "+blk.slotDuration+" мин/слот")
+            ),
+            h("button",{cls:"btn br bsm",onclick:async()=>{
+              const nb=(day.blocks||[]).filter(b=>b.id!==blk.id);
+              S.schedule={...S.schedule,[SCR.schDate]:{...day,blocks:nb}};
+              triggerSave(["schedule"]);rebSlots();
+            }},"Удалить")
+          ));
+        });
+      }
+      let showBF=false;
+      const addBBtn=h("button",{cls:"btn bs bsm",sty:{marginBottom:10},onclick:()=>{showBF=!showBF;rebBF();}},"+  Добавить блок");
+      const bForm=h("div",{cls:"card",sty:{marginBottom:10,display:"none"}});
+      const fT=h("input",{cls:"fi",type:"time",value:"09:00"});
+      const tT=h("input",{cls:"fi",type:"time",value:"13:00"});
+      const cSel=h("select",{cls:"fi"});cSel.appendChild(h("option",{value:""},"— Клиника —"));CLINICS.forEach(c=>cSel.appendChild(h("option",{value:c},c)));
+      const cC=h("input",{cls:"fi",placeholder:"Или введите название..."});
+      const durI=h("input",{cls:"fi",type:"number",value:"30",placeholder:"Мин/слот"});
+      bForm.appendChild(h("div",{sty:{fontWeight:700,marginBottom:10}},"Новый блок: "+fmtD(SCR.schDate)));
+      bForm.appendChild(h("div",{sty:{display:"grid",gridTemplateColumns:"1fr 1fr",gap:8,marginBottom:8}},
+        h("div",{cls:"fg"},h("label",{cls:"fl"},"С"),fT),h("div",{cls:"fg"},h("label",{cls:"fl"},"По"),tT)));
+      bForm.appendChild(h("div",{cls:"fg"},h("label",{cls:"fl"},"Место приёма"),cSel,cC));
+      bForm.appendChild(h("div",{cls:"fg"},h("label",{cls:"fl"},"Длительность слота (мин)"),durI));
+      bForm.appendChild(h("div",{sty:{display:"flex",gap:8}},
+        h("button",{cls:"btn bp",sty:{flex:1},onclick:async()=>{
+          const clinic=cSel.value||cC.value||"";
+          const newBlock={id:uid(),fromTime:fT.value,toTime:tT.value,clinic,slotDuration:parseInt(durI.value)||30};
+          const newSlots=generateSlots(newBlock);
+          const curDay=S.schedule[SCR.schDate]||{blocks:[],slots:[]};
+          const merged=mergeSlots(curDay.slots||[],newSlots);
+          const newBlocks=[...(curDay.blocks||[]),newBlock];
+          S.schedule={...S.schedule,[SCR.schDate]:{blocks:newBlocks,slots:merged}};
+          triggerSave(["schedule"]);showBF=false;rebSlots();
+        }},"Добавить"),
+        h("button",{cls:"btn bs",onclick:()=>{showBF=false;rebBF();}},"Отмена")
+      ));
+      function rebBF(){addBBtn.style.display=showBF?"none":"inline-flex";bForm.style.display=showBF?"block":"none";}
+      slWrap.appendChild(addBBtn);slWrap.appendChild(bForm);
+    }
+
+
+
+    slWrap.appendChild(h("div",{cls:"st"},"Слоты"+(slots.length?" ("+slots.length+")":"")));
+    if(!slots.length){slWrap.appendChild(h("div",{sty:{fontSize:13,color:"var(--mu)",padding:"10px 0"}},"Нет слотов. Добавьте блок работы."));}
+    const grid=h("div",{sty:{display:"flex",flexWrap:"wrap"}});
+    slots.forEach(s=>{
+      const cls=s.available?"fr":(s.patientId?"bk":"cls");
+      const el=h("div",{cls:"slt "+cls},
+        s.time,
+        s.clinic&&!s.patientId?h("div",{cls:"slt-name"},s.clinic):null,
+        s.patientId?h("div",{cls:"slt-name"},s.patientName?.split(" ")[0]+(s.serviceName?" · "+s.serviceName.substring(0,8):"")):"  "
+      );
+      el.onclick=()=>showSlotDetail(s);
+      grid.appendChild(el);
+    });
+    slWrap.appendChild(grid);
+
+    function showSlotDetail(s){
+      detWrap.innerHTML="";
+      const box=h("div",{cls:"card",sty:{marginTop:12}});
+      box.appendChild(h("div",{sty:{fontWeight:700,fontSize:15,marginBottom:12}},s.time+(s.endTime?" – "+s.endTime:"")+" · "+fmtD(SCR.schDate)));
+      if(s.patientId){
+        const pp=S.patients.find(x=>x.id===s.patientId);
+        box.appendChild(h("div",{sty:{marginBottom:12}},
+          h("div",{sty:{fontWeight:600,fontSize:15}},s.patientName),
+          s.serviceName?h("div",{sty:{fontSize:13,color:"var(--mu)"}},s.serviceName+(s.serviceDuration?" · "+s.serviceDuration+" мин":"")):null,
+          s.clinic?h("div",{sty:{fontSize:12,color:"var(--mu)"}},"📍 "+s.clinic):null
+        ));
+        box.appendChild(h("div",{sty:{display:"flex",gap:8}},
+          pp?h("button",{cls:"btn bp",sty:{flex:1},onclick:()=>{detWrap.innerHTML="";detWrap.appendChild(renderPatDetail(pp,role,()=>detWrap.innerHTML=""));}},"Открыть карточку"):null,
+          h("button",{cls:"btn bs",onclick:async()=>{
+            const ns={...S.schedule,[SCR.schDate]:{...S.schedule[SCR.schDate],slots:(S.schedule[SCR.schDate]?.slots||[]).map(sl=>sl.id!==s.id?sl:{...sl,available:true,patientId:null,patientName:null,serviceId:null,serviceName:null})}};
+            S.schedule=ns;triggerSave(["schedule"]);rebSlots();
+          }},"Освободить"),
+          h("button",{cls:"btn bs",onclick:()=>detWrap.innerHTML=""},"✕")
+        ));
+      } else if(s.available){
+        box.appendChild(h("div",{sty:{fontSize:13,color:"var(--mu)",marginBottom:14}},"Слот свободен"+(s.clinic?" · "+s.clinic:"")));
+        let selPat=null,showNewPat=false,selSvc=null,showNewSvc=false,customDur=null;
+        const bookWrap=h("div",{});box.appendChild(bookWrap);
+        function rebBook(){
+          bookWrap.innerHTML="";
+          // Patient selector
+          const patSel=h("select",{cls:"fi"});
+          patSel.appendChild(h("option",{value:""},"— Выберите пациента —"));
+          [...S.patients].sort((a,b)=>a.name.localeCompare(b.name)).forEach(p=>{const o=h("option",{value:p.id},p.name+" · "+p.phone);if(selPat?.id===p.id)o.selected=true;patSel.appendChild(o);});
+          patSel.appendChild(h("option",{value:"__new__"},"+ Создать нового пациента..."));
+          patSel.onchange=e=>{if(e.target.value==="__new__"){showNewPat=true;selPat=null;}else{selPat=S.patients.find(p=>p.id===e.target.value)||null;showNewPat=false;}rebBook();};
+          bookWrap.appendChild(h("div",{cls:"fg"},h("label",{cls:"fl"},"Пациент"),patSel));
+          // New patient mini-form
+          if(showNewPat){
+            const nN=h("input",{cls:"fi",placeholder:"Имя и фамилия *"});
+            const nP=h("input",{cls:"fi",type:"tel",placeholder:"Телефон *",sty:{marginTop:8}});
+            bookWrap.appendChild(h("div",{cls:"card",sty:{marginBottom:10}},
+              h("div",{sty:{fontWeight:700,marginBottom:8}},"Новый пациент"),nN,nP,
+              h("button",{cls:"btn bs bsm",sty:{marginTop:8},onclick:async()=>{
+                if(!nN.value.trim()||!nP.value.trim())return;
+                const np={id:uid(),name:nN.value.trim(),phone:nP.value.trim(),source:"other",birthDate:"",complaint:"",tasks:[],notes:[],createdAt:new Date().toISOString(),status:"new"};
+                await savePats([...S.patients,np],true);selPat=np;showNewPat=false;rebBook();
+              }},"Создать и выбрать")
+            ));
+          }
+          // Service selector
+          const svcSel=h("select",{cls:"fi"});
+          svcSel.appendChild(h("option",{value:""},"— Выберите услугу —"));
+          S.services.forEach(sv=>{const o=h("option",{value:sv.id},sv.name+(sv.price?" · "+Number(sv.price).toLocaleString("ru-RU")+" ₽":""));if(selSvc?.id===sv.id)o.selected=true;svcSel.appendChild(o);});
+          svcSel.appendChild(h("option",{value:"__new__"},"+ Создать новую услугу..."));
+          svcSel.onchange=e=>{if(e.target.value==="__new__"){showNewSvc=true;selSvc=null;}else{selSvc=S.services.find(sv=>sv.id===e.target.value)||null;customDur=selSvc?.duration||null;showNewSvc=false;}rebBook();};
+          bookWrap.appendChild(h("div",{cls:"fg"},h("label",{cls:"fl"},"Услуга"),svcSel));
+          // New service mini-form
+          if(showNewSvc){
+            const sN=h("input",{cls:"fi",placeholder:"Название услуги *"});
+            const sP=h("input",{cls:"fi",type:"number",placeholder:"Стоимость, ₽",sty:{marginTop:8}});
+            const sD=h("input",{cls:"fi",type:"number",placeholder:"Длительность, мин",sty:{marginTop:8}});
+            bookWrap.appendChild(h("div",{cls:"card",sty:{marginBottom:10}},
+              h("div",{sty:{fontWeight:700,marginBottom:8}},"Новая услуга"),sN,sP,sD,
+              h("button",{cls:"btn bs bsm",sty:{marginTop:8},onclick:()=>{
+                if(!sN.value.trim())return;
+                const sv={id:uid(),name:sN.value.trim(),price:sP.value||"",duration:parseInt(sD.value)||30};
+                S.services=[...S.services,sv];triggerSave(["services"]);selSvc=sv;customDur=sv.duration;showNewSvc=false;rebBook();
+              }},"Создать услугу")
+            ));
+          }
+          // Duration override
+          if(selSvc){
+            const durI=h("input",{cls:"fi",type:"number",value:String(customDur||selSvc.duration||30)});
+            durI.oninput=e=>customDur=parseInt(e.target.value)||30;
+            bookWrap.appendChild(h("div",{cls:"fg"},h("label",{cls:"fl"},"Длительность (мин)"),durI));
+          }
+          const canBook=!!(selPat&&selSvc&&!showNewPat&&!showNewSvc);
+          // Book button
+          const bookBtn=h("button",{cls:"btn bp bw",onclick:async()=>{
+            const dur=customDur||selSvc.duration||30;
+            const upSlot={...s,available:false,patientId:selPat.id,patientName:selPat.name,serviceId:selSvc.id,serviceName:selSvc.name,serviceDuration:dur};
+            S.patients=S.patients.map(pr=>pr.id!==selPat.id?pr:{...pr,status:pr.status==="new"?"scheduled":pr.status});
+            S.schedule={...S.schedule,[SCR.schDate]:{...S.schedule[SCR.schDate],slots:(S.schedule[SCR.schDate]?.slots||[]).map(sl=>sl.id!==s.id?sl:upSlot)}};
+            triggerSave(["patients","schedule"]);detWrap.innerHTML="";rebSlots();
+          }},canBook?"✓ Записать на приём":"Выберите пациента и услугу");
+          bookBtn.disabled=!canBook;
+          bookWrap.appendChild(h("div",{sty:{marginBottom:8}},bookBtn));
+          bookWrap.appendChild(h("div",{sty:{display:"flex",gap:8}},
+            h("button",{cls:"btn bs",sty:{flex:1},onclick:async()=>{
+              S.schedule={...S.schedule,[SCR.schDate]:{...S.schedule[SCR.schDate],slots:(S.schedule[SCR.schDate]?.slots||[]).map(sl=>sl.id!==s.id?sl:{...sl,available:false})}};
+              triggerSave(["schedule"]);rebSlots();
+            }},"Закрыть слот"),
+            h("button",{cls:"btn bs",onclick:()=>detWrap.innerHTML=""},"✕")
+          ));
+        }
+        rebBook();
+      } else {
+        box.appendChild(h("div",{sty:{fontSize:13,color:"var(--mu)",marginBottom:12}},"Слот закрыт"));
+        box.appendChild(h("div",{sty:{display:"flex",gap:8}},
+          h("button",{cls:"btn bs",sty:{flex:1},onclick:async()=>{
+            const ns={...S.schedule,[SCR.schDate]:{...S.schedule[SCR.schDate],slots:(S.schedule[SCR.schDate]?.slots||[]).map(sl=>sl.id!==s.id?sl:{...sl,available:true})}};
+            S.schedule=ns;triggerSave(["schedule"]);rebSlots();
+          }},"Открыть"),
+          h("button",{cls:"btn bs",onclick:()=>detWrap.innerHTML=""},"Отмена")
+        ));
+      }
+      detWrap.appendChild(box);
+    }
+
+    function showAddSlot(){
+      detWrap.innerHTML="";
+      const box=h("div",{cls:"card",sty:{marginTop:12}});
+      const tI=h("input",{cls:"fi",type:"time",value:"08:00"});
+      const cSel=h("select",{cls:"fi"});cSel.appendChild(h("option",{value:""},"— Клиника —"));CLINICS.forEach(c=>cSel.appendChild(h("option",{value:c},c)));
+      const cC=h("input",{cls:"fi",placeholder:"Или введите..."});
+      box.appendChild(h("div",{sty:{fontWeight:700,marginBottom:10}},"Новый слот · "+fmtD(SCR.schDate)));
+      box.appendChild(h("div",{cls:"fg"},h("label",{cls:"fl"},"Время"),tI));
+      box.appendChild(h("div",{cls:"fg"},h("label",{cls:"fl"},"Клиника"),cSel,cC));
+      box.appendChild(h("div",{sty:{display:"flex",gap:8}},
+        h("button",{cls:"btn bp",sty:{flex:1},onclick:async()=>{
+          const t=tI.value;if(!t)return;
+          const clinic=cSel.value||cC.value||"";
+          const exist=S.schedule[SCR.schDate]?.slots||[];
+          if(exist.find(s=>s.time===t)){detWrap.innerHTML="";detWrap.appendChild(h("div",{cls:"alert alert-err"},"Слот "+t+" уже существует"));return;}
+          const ns={...S.schedule,[SCR.schDate]:{...S.schedule[SCR.schDate],slots:[...exist,{id:uid(),time:t,endTime:"",available:true,patientId:null,patientName:null,serviceId:null,serviceName:null,serviceDuration:30,clinic}].sort((a,b)=>a.time.localeCompare(b.time))}};
+          S.schedule=ns;triggerSave(["schedule"]);rebSlots();
+        }},"Добавить"),
+        h("button",{cls:"btn bs",onclick:()=>detWrap.innerHTML=""},"Отмена")
+      ));
+      detWrap.appendChild(box);
+    }
+  }
+
+  function rebAll(){rebDates();rebSlots();}
+
+  function showCopyModal(){
+    let overlay;
+    function close(){if(overlay?.parentNode)overlay.parentNode.removeChild(overlay);}
+    const srcI=h("input",{cls:"fi",type:"date",value:SCR.schDate});
+    const fromI=h("input",{cls:"fi",type:"date",value:SCR.schDate});
+    const toI=h("input",{cls:"fi",type:"date"});
+    // Default to end of month
+    const lastDay=new Date(SCR.schYear,SCR.schMonth+1,0);
+    toI.value=lastDay.toISOString().split("T")[0];
+    const previewEl=h("div",{sty:{fontSize:13,color:"var(--mu)",marginTop:8}});
+    function updatePreview(){
+      if(!srcI.value||!fromI.value||!toI.value||fromI.value>toI.value){previewEl.textContent="";return;}
+      const srcMon=getMonday(srcI.value);
+      let count=0;const cur=new Date(fromI.value+"T12:00:00");const end=new Date(toI.value+"T12:00:00");
+      while(cur<=end){const dow=cur.getDay();const ds=cur.toISOString().split("T")[0];
+        if(dow!==0&&dow!==6){const srcD=new Date(srcMon+" ");srcD.setDate(srcD.getDate()+(dow===0?6:dow-1));const sds=srcD.toISOString().split("T")[0];if(S.schedule[sds]?.blocks?.length)count++;}
+        cur.setDate(cur.getDate()+1);}
+      previewEl.textContent="Будет скопировано блоков на "+count+" рабочих дней";
+    }
+    srcI.oninput=fromI.oninput=toI.oninput=updatePreview;
+    updatePreview();
+    const body=h("div",{cls:"modal"},
+      h("div",{sty:{display:"flex",alignItems:"center",justifyContent:"space-between",marginBottom:16}},
+        h("div",{sty:{fontWeight:800,fontSize:18}},"Копировать расписание"),
+        h("button",{cls:"hb",sty:{background:"var(--bg)",color:"var(--tx)"},onclick:close},"✕")
+      ),
+      h("div",{cls:"alert alert-warn",sty:{marginBottom:16}},"Копирует блоки работы по дням недели. Понедельник → все понедельники периода, вторник → все вторники и т.д. Уже записанные пациенты не затрагиваются."),
+      h("div",{cls:"fg"},h("label",{cls:"fl"},"Образец (любой день исходной недели)"),srcI),
+      h("div",{sty:{display:"grid",gridTemplateColumns:"1fr 1fr",gap:8}},
+        h("div",{cls:"fg"},h("label",{cls:"fl"},"Целевой период: с"),fromI),
+        h("div",{cls:"fg"},h("label",{cls:"fl"},"по"),toI)
+      ),
+      previewEl,
+      h("button",{cls:"btn bp bw",sty:{marginTop:12},onclick:async()=>{
+        if(!srcI.value||!fromI.value||!toI.value||fromI.value>toI.value)return;
+        const count=copyScheduleByWeek(srcI.value,fromI.value,toI.value);
+        close();rebAll();
+        const msg=h("div",{cls:"alert alert-ok",sty:{marginTop:8}},"✓ Скопировано на "+count+" дней");
+        slWrap.insertBefore(msg,slWrap.firstChild);
+        setTimeout(()=>msg.remove(),3000);
+      }},"Скопировать")
+    );
+    overlay=h("div",{cls:"overlay",onclick:e=>{if(e.target===overlay)close();}},body);
+    document.getElementById("app").appendChild(overlay);
+  }
+
+  rebDates();rebSlots();
+  wrap.appendChild(calWrap);wrap.appendChild(slWrap);wrap.appendChild(detWrap);
+  return wrap;
+}
+// ===================== ADMIN PANEL =====================
+function renderAdminUsers(reb){
+  const wrap=h("div",{});
+  wrap.appendChild(h("h2",{sty:{fontSize:20,fontWeight:800,marginBottom:16}},"Пользователи"));
+  // Existing users
+  S.users.forEach(u=>{
+    const isMe=u.id===S.session?.userId;
+    const row=h("div",{cls:"card",sty:{display:"flex",alignItems:"center",justifyContent:"space-between",marginBottom:8,padding:"12px 14px"}},
+      h("div",{},
+        h("div",{sty:{fontWeight:600}},u.name+(isMe?" (вы)":""),h("span",{cls:"badge",sty:{background:u.active!==false?"#E8F5F2":"#FEF2F2",color:u.active!==false?"#059669":"#DC2626"}},u.active!==false?"активен":"заблокирован")),
+        h("div",{sty:{fontSize:12,color:"var(--mu)"}},u.email+" · "+ROLES[u.role])
+      ),
+      !isMe?h("div",{sty:{display:"flex",gap:6}},
+        h("button",{cls:"btn bs bsm","data-edit-uid":u.id},"✏️ Изм."),
+        h("button",{cls:"btn bs bsm",onclick:async()=>{
+          S.users=S.users.map(x=>x.id!==u.id?x:{...x,active:!(x.active!==false)});
+          triggerSave(["users"]);reb&&reb();
+        }},u.active!==false?"Блок.":"Разбл."),
+        h("button",{cls:"btn br bsm",onclick:async()=>{
+          if(!confirm("Удалить пользователя "+u.name+"?"))return;
+          S.users=S.users.filter(x=>x.id!==u.id);triggerSave(["users"]);reb&&reb();
+        }},"Удалить")
+      ):null
+    );
+    wrap.appendChild(row);
+  });
+  // Add user form
+  let showF=false,editUserId=null;
+  const addBtn=h("button",{cls:"btn bs bw",sty:{marginTop:4},onclick:()=>{showF=true;editUserId=null;rebF();}},"+  Добавить пользователя");
+  const form=h("div",{cls:"card",sty:{marginTop:8,display:"none"}});
+  const nI=h("input",{cls:"fi",placeholder:"Имя пользователя"});
+  const eI=h("input",{cls:"fi",type:"email",placeholder:"login@example.com"});
+  const pI=h("input",{cls:"fi",type:"text",placeholder:"Пароль (мин. 4 символа)"});
+  const rSel=h("select",{cls:"fi"});
+  Object.entries(ROLES).forEach(([k,v])=>rSel.appendChild(h("option",{value:k},v)));
+  const formTitle=h("div",{sty:{fontWeight:700,marginBottom:10}},"Новый пользователь");
+  const credBox=h("div",{cls:"alert alert-ok",sty:{marginBottom:10,display:"none",whiteSpace:"pre-wrap",fontSize:13,wordBreak:"break-word"}});
+  form.appendChild(formTitle);
+  form.appendChild(h("div",{sty:{display:"grid",gridTemplateColumns:"1fr 1fr",gap:8}},
+    h("div",{cls:"fg"},h("label",{cls:"fl"},"Имя"),nI),
+    h("div",{cls:"fg"},h("label",{cls:"fl"},"Логин (email)"),eI)
+  ));
+  form.appendChild(h("div",{sty:{display:"grid",gridTemplateColumns:"1fr 1fr",gap:8}},
+    h("div",{cls:"fg"},h("label",{cls:"fl"},"Пароль"),pI),
+    h("div",{cls:"fg"},h("label",{cls:"fl"},"Роль"),rSel)
+  ));
+  form.appendChild(credBox);
+  form.appendChild(h("div",{sty:{display:"flex",gap:8}},
+    h("button",{cls:"btn bp",sty:{flex:1},onclick:async()=>{
+      if(!nI.value.trim()||!eI.value.trim()||!pI.value.trim()){
+        credBox.className="alert alert-err";credBox.style.display="block";credBox.textContent="Заполните все поля";return;
+      }
+      if(pI.value.trim().length<4){
+        credBox.className="alert alert-err";credBox.style.display="block";credBox.textContent="Пароль — минимум 4 символа";return;
+      }
+      const email=eI.value.trim().toLowerCase();
+      const existing=S.users.find(u=>u.email===email);
+      if(existing&&existing.id!==editUserId){
+        credBox.className="alert alert-err";credBox.style.display="block";credBox.textContent="Пользователь с таким логином уже существует";return;
+      }
+      const hash=await hashPw(pI.value.trim());
+      if(editUserId){
+        // Edit existing
+        S.users=S.users.map(u=>u.id!==editUserId?u:{...u,email,name:nI.value.trim(),role:rSel.value,passwordHash:hash});
+      } else {
+        const nu={id:uid(),email,name:nI.value.trim(),role:rSel.value,passwordHash:hash,active:true,createdAt:new Date().toISOString()};
+        S.users=[...S.users,nu];
+      }
+      cacheSet("users",S.users);apiPost("users",S.users);_pendingKeys.delete("users");
+      // Show credentials to copy
+      const appUrl=window.location.href.replace(/#.*$/,"");
+      credBox.className="alert alert-ok";credBox.style.display="block";
+      const savedPw=pI.value.trim(),savedEmail=email,savedName=nI.value.trim();
+      nI.value="";eI.value="";pI.value="";const wasEdit=editUserId;editUserId=null;
+      credBox.textContent="✓ "+(wasEdit?"Обновлено":"Создан")+"! Передайте участнику:
+
+Ссылка: "+appUrl+"
+Логин: "+savedEmail+"
+Пароль: "+savedPw;
+      // Copy to clipboard
+      navigator.clipboard?.writeText("Ссылка: "+appUrl+"
+Логин: "+savedEmail+"
+Пароль: "+savedPw).catch(()=>{});
+      setTimeout(()=>{ credBox.style.display="none"; reb&&reb(); },8000);
+    }},editUserId?"Сохранить":"Создать"),
+    h("button",{cls:"btn bs",onclick:()=>{showF=false;editUserId=null;rebF();credBox.style.display="none";}},"Отмена")
+  ));
+  function rebF(){addBtn.style.display=showF?"none":"flex";form.style.display=showF?"block":"none";}
+  // Edit buttons on user rows — hook into showF/editUserId
+  wrap.querySelectorAll("[data-edit-uid]").forEach(btn=>{
+    btn.onclick=()=>{
+      const uid=btn.dataset.editUid;
+      const u=S.users.find(x=>x.id===uid);
+      if(!u)return;
+      editUserId=uid;nI.value=u.name;eI.value=u.email;
+      rSel.value=u.role;pI.value="";formTitle.textContent="Редактировать: "+u.name;
+      showF=true;rebF();form.scrollIntoView({behavior:"smooth",block:"nearest"});
+    };
+  });
+  wrap.appendChild(addBtn);wrap.appendChild(form);
+  return wrap;
+}
+
+function renderAdminServices(reb){
+  const wrap=h("div",{});
+  wrap.appendChild(h("h2",{sty:{fontSize:20,fontWeight:800,marginBottom:16}},"Услуги"));
+  if(!S.services.length)wrap.appendChild(h("div",{cls:"emp",sty:{padding:"20px 0"}},h("div",{},"Нет услуг")));
+  S.services.forEach(sv=>{
+    wrap.appendChild(h("div",{cls:"card",sty:{display:"flex",alignItems:"center",justifyContent:"space-between",marginBottom:8,padding:"12px 14px"}},
+      h("div",{},
+        h("div",{sty:{fontWeight:600}},sv.name),
+        h("div",{sty:{fontSize:12,color:"var(--mu)"}},(sv.price?Number(sv.price).toLocaleString("ru-RU")+" ₽ · ":"")+(sv.duration?sv.duration+" мин":""))
+      ),
+      h("button",{cls:"btn br bsm",onclick:async()=>{
+        if(!confirm("Удалить услугу "+sv.name+"?"))return;
+        S.services=S.services.filter(s=>s.id!==sv.id);triggerSave(["services"]);reb&&reb();
+      }},"Удалить")
+    ));
+  });
+  let showF=false;
+  const addBtn=h("button",{cls:"btn bs bw",sty:{marginTop:4},onclick:()=>{showF=true;rebF();}},"+  Добавить услугу");
+  const form=h("div",{cls:"card",sty:{marginTop:8,display:"none"}});
+  const nI=h("input",{cls:"fi",placeholder:"Название услуги",sty:{marginBottom:8}});
+  const pI=h("input",{cls:"fi",type:"number",placeholder:"Стоимость, ₽",sty:{marginBottom:8}});
+  const dI=h("input",{cls:"fi",type:"number",placeholder:"Длительность, мин",sty:{marginBottom:8}});
+  form.appendChild(h("div",{sty:{fontWeight:700,marginBottom:10}},"Новая услуга"));
+  form.appendChild(h("div",{cls:"fg"},h("label",{cls:"fl"},"Название *"),nI));
+  form.appendChild(h("div",{sty:{display:"grid",gridTemplateColumns:"1fr 1fr",gap:8,marginBottom:8}},
+    h("div",{cls:"fg"},h("label",{cls:"fl"},"Стоимость (₽)"),pI),
+    h("div",{cls:"fg"},h("label",{cls:"fl"},"Длительность (мин)"),dI)
+  ));
+  form.appendChild(h("div",{sty:{display:"flex",gap:8}},
+    h("button",{cls:"btn bp",sty:{flex:1},onclick:async()=>{
+      if(!nI.value.trim())return;
+      S.services=[...S.services,{id:uid(),name:nI.value.trim(),price:pI.value||"",duration:parseInt(dI.value)||30}];
+      triggerSave(["services"]);showF=false;reb&&reb();
+    }},"Добавить"),
+    h("button",{cls:"btn bs",onclick:()=>{showF=false;rebF();}},"Отмена")
+  ));
+  function rebF(){addBtn.style.display=showF?"none":"flex";form.style.display=showF?"block":"none";}
+  wrap.appendChild(addBtn);wrap.appendChild(form);
+  return wrap;
+}
+
+// ===================== SAVE HELPERS =====================
+async function savePats(arr,noRender){
+  S.patients=arr;cacheSet("patients",arr);triggerSave(["patients"]);
+  if(!noRender)render();
+}
+
+// ===================== DOCTOR / ADMIN =====================
+function renderDoctor(){
+  const td=today();
+  // Live data computed in rebMain to stay fresh
+  const wrap=h("div",{cls:"desktop"});
+  const sb=h("div",{cls:"sb"});
+  sb.appendChild(h("div",{sty:{marginBottom:20,paddingLeft:4}},
+    h("div",{sty:{fontSize:14,fontWeight:800,color:"var(--p)"}},"🩺 Доктор Войнов"),
+    h("div",{sty:{fontSize:11,color:"var(--mu)",marginTop:2}},S.session?.name||""),
+    h("div",{sty:{fontSize:10,color:"#059669",marginTop:2}},"✓ Google Sheets")
+  ));
+  const isAdmin=S.session?.role==="admin";
+  const navItems=[{k:"dashboard",i:"📊",l:"Дашборд"},{k:"patients",i:"👥",l:"Пациенты"},{k:"schedule",i:"📅",l:"Расписание"}];
+  if(isAdmin)navItems.push({k:"admin",i:"⚙️",l:"Администратор"});
+  navItems.forEach(n=>{
+    sb.appendChild(h("button",{cls:"si"+(SCR.dview===n.k&&!SCR.editId?" on":""),onclick:()=>{SCR.dview=n.k;SCR.editId=null;rebMain();}},h("span",{},n.i),n.l));
+  });
+  sb.appendChild(h("div",{sty:{flex:1}}));
+  // Role preview switcher (admin only)
+  if(isAdmin){
+    const prvSec=h("div",{sty:{borderTop:"1px solid var(--bd)",paddingTop:8,marginBottom:4}});
+    prvSec.appendChild(h("div",{sty:{fontSize:10,color:"var(--hi)",fontWeight:700,letterSpacing:".5px",textTransform:"uppercase",padding:"0 11px 4px"}},"Просмотр как"));
+    [{r:"doctor",i:"👨‍⚕️",l:"Врач"},{r:"assistant",i:"📱",l:"Ассистент"},{r:"web",i:"🌐",l:"Команда сайта"}].forEach(({r,i,l})=>{
+      prvSec.appendChild(h("button",{cls:"si",onclick:()=>{S._previewFrom=S.session.role;S.session={...S.session,role:r};SCR.tab="today";SCR.sub=null;render();}},h("span",{},i),l));
+    });
+    sb.appendChild(prvSec);
+  }
+  sb.appendChild(mkSyncBar());
+  sb.appendChild(h("button",{cls:"si",onclick:()=>{
+    const u=S.users.find(x=>x.id===S.session?.userId);
+    if(u){SCR.dview="changepw";SCR.editId=null;rebMain();}
+  }},"🔑 Сменить пароль"));
+  sb.appendChild(h("button",{cls:"si",sty:{color:"var(--r)"},onclick:()=>{S.session=null;saveCfg();render();}},"🚪 Выход"));
+  const main=h("div",{cls:"dmain"});
+  function rebMain(){
+    // Recompute live data on each navigation
+    const todaySl=(S.schedule[td]?.slots||[]).filter(s=>!s.available&&s.patientId);
+    const needC=S.patients.filter(p=>p.nextContact&&p.nextContact<=td);
+    const upOps=S.patients.filter(p=>p.opDate&&p.opDate>=td).sort((a,b)=>a.opDate.localeCompare(b.opDate));
+    sb.querySelectorAll(".si").forEach((b,i)=>{if(i<navItems.length)b.className="si"+(navItems[i].k===SCR.dview&&!SCR.editId?" on":"");});
+    main.innerHTML="";
+    if(SCR.editId){const p=S.patients.find(x=>x.id===SCR.editId);main.appendChild(renderPatDetail(p,S.session.role,()=>{SCR.editId=null;rebMain();}));}
+    else if(SCR.dview==="dashboard")main.appendChild(docDash(todaySl,needC,upOps,td,rebMain));
+    else if(SCR.dview==="patients")main.appendChild(docPats(td,rebMain));
+    else if(SCR.dview==="schedule")main.appendChild(renderSchedule(S.session.role));
+    else if(SCR.dview==="changepw"){
+      const u=S.users.find(x=>x.id===S.session?.userId);
+      if(u)main.appendChild(renderChangePassword(u,()=>{SCR.dview="dashboard";rebMain();}));
+    }
+    else if(SCR.dview==="admin"){
+      const adminTabs=h("div",{cls:"tabs",sty:{marginBottom:16}});
+      const adminMain=h("div",{});
+      let curAdminTab="users";
+      function drawAdmin(t){
+        curAdminTab=t||curAdminTab;
+        adminMain.innerHTML="";
+        adminTabs.querySelectorAll(".tb").forEach(b=>b.className="tb "+(b.dataset.t===curAdminTab?"on":"off"));
+        if(curAdminTab==="users")adminMain.appendChild(renderAdminUsers(()=>drawAdmin("users")));
+        else adminMain.appendChild(renderAdminServices(()=>drawAdmin("services")));
+      }
+      [["users","Пользователи"],["services","Услуги"]].forEach(([t,l])=>{
+        const b=h("button",{cls:"tb "+(t==="users"?"on":"off")},l);b.dataset.t=t;b.onclick=()=>drawAdmin(t);adminTabs.appendChild(b);
+      });
+      drawAdmin();
+      main.appendChild(h("h2",{sty:{fontSize:22,fontWeight:800,marginBottom:16}},"Администратор"));
+      main.appendChild(adminTabs);main.appendChild(adminMain);
+    }
+  }
+  rebMain();wrap.appendChild(sb);wrap.appendChild(main);return wrap;
+}
+
+function docDash(todaySl,needC,upOps,td,reb){
+  const wrap=h("div",{});
+  wrap.appendChild(h("h2",{sty:{fontSize:22,fontWeight:800,marginBottom:4}},"Дашборд"));
+  wrap.appendChild(h("div",{sty:{fontSize:13,color:"#6B7280",marginBottom:20}},fmtF(td)));
+  wrap.appendChild(h("div",{cls:"sg"},
+    h("div",{cls:"sc"},h("div",{cls:"sn"},S.patients.length),h("div",{cls:"sl"},"Пациентов")),
+    h("div",{cls:"sc"},h("div",{cls:"sn"},todaySl.length),h("div",{cls:"sl"},"Сегодня")),
+    h("div",{cls:"sc"},h("div",{cls:"sn",sty:{color:needC.length?"#D97706":"var(--p)"}},needC.length),h("div",{cls:"sl"},"К контакту"))
+  ));
+  if(todaySl.length){
+    wrap.appendChild(h("div",{cls:"st"},"Приёмы сегодня"));
+    todaySl.forEach(s=>wrap.appendChild(h("div",{cls:"crow",onclick:()=>{SCR.editId=s.patientId;reb();}},
+      h("div",{sty:{fontWeight:800,fontSize:16,color:"var(--p)",width:44,textAlign:"center",flexShrink:0}},s.time),
+      h("div",{},h("div",{sty:{fontWeight:600}},s.patientName),
+        s.serviceName?h("div",{sty:{fontSize:12,color:"var(--mu)"}},s.serviceName+(s.clinic?" · "+s.clinic:"")):null)
+    )));
+  }
+  if(needC.length){
+    wrap.appendChild(h("div",{cls:"st",sty:{color:"#D97706"}},"⚠️ Требуют контакта"));
+    needC.forEach(p=>wrap.appendChild(h("div",{cls:"card",sty:{borderLeft:"3px solid #D97706",cursor:"pointer",padding:"10px 14px"},onclick:()=>{SCR.editId=p.id;reb();}},
+      h("div",{sty:{fontWeight:600}},p.name),h("div",{sty:{fontSize:12,color:"var(--mu)"}},"📞 "+p.phone+" · "+fmtD(p.nextContact))
+    )));
+  }
+  if(upOps.length){
+    wrap.appendChild(h("div",{cls:"st"},"Предстоящие операции"));
+    upOps.slice(0,6).forEach(p=>wrap.appendChild(h("div",{cls:"crow",onclick:()=>{SCR.editId=p.id;reb();}},
+      h("div",{},h("div",{sty:{fontWeight:600}},p.name),h("div",{sty:{fontSize:12,color:"var(--mu)"}},"🗓 "+(p.opDate?fmtD(p.opDate):p.opDateText||"—")+(p.opPrice?" · "+Number(p.opPrice).toLocaleString("ru-RU")+" ₽":"")))
+    )));
+  }
+  if(!S.patients.length)wrap.appendChild(h("div",{cls:"emp"},h("div",{cls:"empi"},"📋"),h("div",{},"Пациентов пока нет")));
+  return wrap;
+}
+
+function docPats(td,reb){
+  const wrap=h("div",{});
+  wrap.appendChild(h("h2",{sty:{fontSize:22,fontWeight:800,marginBottom:4}},"Пациенты"));
+  const addBtn=h("button",{cls:"btn bp bsm",sty:{marginBottom:16},onclick:()=>{SCR.editId="__new__";reb();}},"+  Добавить");
+  wrap.appendChild(addBtn);
+  const inp=h("input",{cls:"fi",placeholder:"Поиск...",sty:{marginBottom:16}});
+  const tW=h("div",{cls:"card",sty:{padding:0,overflow:"hidden"}});
+  const inner=h("div",{sty:{overflowX:"auto"}});
+  if(SCR.editId==="__new__"){
+    // Add patient form inline
+    return renderAddPatForm(S.session.role,()=>{SCR.editId=null;reb();});
+  }
+  function bld(q){
+    inner.innerHTML="";
+    const fl=(q?S.patients.filter(p=>p.name.toLowerCase().includes(q.toLowerCase())||p.phone.includes(q)):[...S.patients]).sort((a,b)=>b.createdAt.localeCompare(a.createdAt));
+    if(!fl.length){inner.appendChild(h("div",{cls:"emp"},h("div",{cls:"empi"},"👥"),h("div",{},"Нет пациентов")));return;}
+    const tbl=h("table",{cls:"tbl"});
+    tbl.appendChild(h("thead",{},h("tr",{},h("th",{},"Пациент"),h("th",{},"Статус"),h("th",{},"Операция"),h("th",{},"Цена"),h("th",{},"Контакт"))));
+    const tb=h("tbody",{});
+    fl.forEach(p=>{const s=ST[p.status];tb.appendChild(h("tr",{onclick:()=>{SCR.editId=p.id;reb();}},
+      h("td",{},h("div",{sty:{fontWeight:600}},p.name),h("div",{sty:{fontSize:11,color:"#6B7280"}},p.phone+(p.birthDate?" · "+ageLabel(p.birthDate):""))),
+      h("td",{},h("span",{cls:"tag",sty:{background:(s?.c||"#ccc")+"22",color:s?.c}},s?.l)),
+      h("td",{},p.opDate?fmtD(p.opDate):(p.opDateText||"—")),
+      h("td",{},p.opPrice?Number(p.opPrice).toLocaleString("ru-RU")+" ₽":"—"),
+      h("td",{sty:{color:p.nextContact&&p.nextContact<=td?"#D97706":"inherit"}},p.nextContact?fmtD(p.nextContact):"—")
+    ));});
+    tbl.appendChild(tb);inner.appendChild(tbl);
+  }
+  inp.addEventListener("input",e=>bld(e.target.value));bld("");
+  tW.appendChild(inner);wrap.appendChild(inp);wrap.appendChild(tW);return wrap;
+}
+
+function renderAddPatForm(role,onBack){
+  const v={name:"",phone:"",source:"instagram",birthDate:"",complaint:""};
+  const nI=h("input",{cls:"fi",placeholder:"Иван Иванов"});nI.oninput=e=>v.name=e.target.value;
+  const phI=h("input",{cls:"fi",type:"tel",placeholder:"+7..."});phI.oninput=e=>v.phone=e.target.value;
+  const bdI=h("input",{cls:"fi",type:"date"});
+  const ageD=h("div",{sty:{fontSize:12,color:"var(--mu)",marginTop:4}});
+  bdI.oninput=e=>{v.birthDate=e.target.value;ageD.textContent=v.birthDate?"Возраст: "+ageLabel(v.birthDate):"";};
+  const sS=h("select",{cls:"fi"});Object.entries(SRC).forEach(([k,l])=>sS.appendChild(h("option",{value:k},l)));sS.oninput=e=>v.source=e.target.value;
+  const cI=h("textarea",{cls:"fi",placeholder:"Кратко..."});cI.oninput=e=>v.complaint=e.target.value;
+  return h("div",{},
+    h("button",{cls:"bbk",onclick:onBack},"← Назад"),
+    h("div",{cls:"fg"},h("label",{cls:"fl"},"Имя и фамилия *"),nI),
+    h("div",{cls:"fg"},h("label",{cls:"fl"},"Телефон *"),phI),
+    h("div",{cls:"fg"},h("label",{cls:"fl"},"Дата рождения"),bdI,ageD),
+    h("div",{cls:"fg"},h("label",{cls:"fl"},"Источник"),sS),
+    h("div",{cls:"fg"},h("label",{cls:"fl"},"Жалоба"),cI),
+    h("button",{cls:"btn bp bw",onclick:async()=>{
+      if(!v.name.trim()||!v.phone.trim())return;
+      const p={id:uid(),name:nI.value.trim(),phone:phI.value.trim(),source:sS.value,birthDate:bdI.value,complaint:cI.value,tasks:[],notes:[],createdAt:new Date().toISOString(),status:"new"};
+      await savePats([...S.patients,p],true);onBack();
+    }},"Добавить пациента")
+  );
+}
+
+// ===================== ASSISTANT =====================
+function renderAssistant(){
+  const td=today();
+  const allT=[];
+  S.patients.forEach(p=>(p.tasks||[]).forEach(t=>{if(!t.completed)allT.push({...t,pId:p.id,pName:p.name,pPhone:p.phone});}));
+  allT.sort((a,b)=>a.dueDate.localeCompare(b.dueDate));
+  const ov=allT.filter(t=>t.dueDate<td),tT=allT.filter(t=>t.dueDate===td),lT=allT.filter(t=>t.dueDate>td);
+  const needC=S.patients.filter(p=>p.nextContact&&p.nextContact<=td);
+  const pend=ov.length+tT.length+needC.length;
+  const wrap=h("div",{sty:{display:"flex",flexDirection:"column",minHeight:"100vh",background:"var(--bg)"}});
+  const hdr=h("header",{cls:"hdr"},
+    h("div",{},h("div",{cls:"ht"},"🩺 Доктор Войнов"),h("div",{cls:"hs"},S.session?.name||"Ассистент")),
+    h("div",{sty:{display:"flex",gap:6}},
+      h("button",{cls:"hb",onclick:()=>{
+        const u=S.users.find(x=>x.id===S.session?.userId);
+        if(!u)return;
+        SCR.sub="changepw";render();
+      }},"🔑"),
+      h("button",{cls:"hb",onclick:()=>{S.session=null;saveCfg();render();}},"Выход")
+    ));
+  let content;
+  if(SCR.sub==="changepw"){
+    const u=S.users.find(x=>x.id===S.session?.userId);
+    content=u?renderChangePassword(u,()=>{SCR.sub=null;render();}):h("div",{},"");
+  }
+  else if(SCR.sub==="addpat")content=renderAddPatForm("assistant",()=>{SCR.sub=null;render();});
+  else if(SCR.sub==="pat"&&SCR.editId){const p=S.patients.find(x=>x.id===SCR.editId);content=renderPatDetail(p,"assistant",()=>{SCR.sub=null;SCR.editId=null;render();});}
+  else if(SCR.tab==="today")content=renderToday(ov,tT,lT,needC);
+  else if(SCR.tab==="pats")content=renderPatsTab();
+  else content=renderSchedule("assistant");
+  const nav=h("nav",{cls:"bn"},
+    ...[{k:"today",i:"✅",l:"Сегодня",b:pend},{k:"pats",i:"👥",l:"Пациенты"},{k:"sched",i:"📅",l:"Расписание"}].map(t=>
+      h("button",{cls:"bt"+(SCR.tab===t.k&&!SCR.sub?" on":""),onclick:()=>{SCR.tab=t.k;SCR.sub=null;render();}},
+        h("span",{cls:"bti"},t.i),h("span",{cls:"btl"},t.l),t.b>0?h("span",{cls:"bdg"},t.b):null)
+    )
+  );
+  const els=[hdr,mkSyncBar(),h("div",{cls:"scr"},content),nav];
+  if(S._previewFrom){
+    els.unshift(h("div",{sty:{background:"#1A1A1A",color:"#fff",padding:"9px 18px",display:"flex",alignItems:"center",justifyContent:"space-between",fontSize:13,flexShrink:0}},
+      h("span",{},"👁 Просмотр: "+ROLES[S.session.role]),
+      h("button",{sty:{background:"var(--p)",border:"none",color:"#fff",padding:"5px 14px",borderRadius:7,cursor:"pointer",fontFamily:"inherit",fontSize:12,fontWeight:700},onclick:()=>{S.session={...S.session,role:S._previewFrom};S._previewFrom=null;render();}},"← Назад в Admin")
+    ));
+  }
+  els.forEach(e=>wrap.appendChild(e));return wrap;
+}
+
+function renderToday(ov,tT,lT,needC){
+  const f=document.createDocumentFragment();
+  const todayTopRow=h("div",{sty:{display:"flex",alignItems:"center",justifyContent:"space-between",marginBottom:4}},
+    h("div",{sty:{fontSize:18,fontWeight:800}},"Задачи на сегодня"),
+    h("button",{cls:"btn bp bsm",onclick:()=>{SCR.sub="addpat";render();}},"+ Пациент")
+  );
+  f.appendChild(todayTopRow);
+  f.appendChild(h("div",{sty:{fontSize:13,color:"var(--mu)",marginBottom:12}},new Date().toLocaleDateString("ru-RU",{weekday:"long",day:"numeric",month:"long"})));
+  if(needC.length){
+    f.appendChild(h("div",{cls:"st",sty:{color:"var(--a)"}},"📞 Требуют контакта — "+needC.length));
+    needC.forEach(p=>f.appendChild(patCard(p,()=>{SCR.sub="pat";SCR.editId=p.id;render();})));
+  }
+  if(ov.length){f.appendChild(h("div",{cls:"st",sty:{color:"var(--r)"}},"⚠️ Просроченные — "+ov.length));ov.forEach(t=>f.appendChild(taskRowSimple(t,true,false)));}
+  if(tT.length){f.appendChild(h("div",{cls:"st"},"📋 Сегодня — "+tT.length));tT.forEach(t=>f.appendChild(taskRowSimple(t,false,false)));}
+  if(!ov.length&&!tT.length&&!needC.length)f.appendChild(h("div",{cls:"emp"},h("div",{cls:"empi"},"🎉"),h("div",{},"Нет срочных задач!")));
+  if(lT.length){f.appendChild(h("div",{cls:"st",sty:{marginTop:8}},"📌 Ближайшие"));lT.slice(0,8).forEach(t=>f.appendChild(taskRowSimple(t,false,true)));}
+  return f;
+}
+function taskRowSimple(t,urg,fut){
+  const el=h("div",{cls:"task-item",sty:urg?{borderLeft:"3px solid var(--r)"}:{}});
+  el.style.borderLeft=urg?"3px solid var(--r)":"";
+  const chk=h("button",{cls:"task-done-btn",onclick:async e=>{
+    e.stopPropagation();
+    await savePats(S.patients.map(p=>p.id!==t.pId?p:{...p,tasks:(p.tasks||[]).map(tk=>tk.id!==t.id?tk:{...tk,completed:true,completedAt:new Date().toISOString()})}),true);
+    // Remove from today list
+    const row=e.target.closest(".task-item");if(row)row.remove();
+  }},"✓");
+  const hdr=h("div",{cls:"task-hdr",onclick:()=>{SCR.openTaskId=t.id;SCR.sub="pat";SCR.editId=t.pId;render();}},
+    h("div",{sty:{flex:1}},
+      h("div",{sty:{fontWeight:700,fontSize:14}},t.pName),
+      h("div",{sty:{fontSize:12,color:"var(--mu)"}},"📞 "+t.pPhone),
+      h("span",{cls:"tag",sty:{background:"var(--pll)",color:"var(--p)"}},CT[t.type]||t.type),
+      t.dueDate!==today()&&h("div",{sty:{fontSize:11,color:fut?"var(--mu)":"var(--r)",marginTop:3}},"📅 "+fmtD(t.dueDate))
+    ),chk
+  );
+  el.appendChild(hdr);return el;
+}
+function renderPatsTab(){
+  const wrap=h("div",{});
+  const hd=h("div",{sty:{display:"flex",alignItems:"center",justifyContent:"space-between",marginBottom:14}},
+    h("div",{sty:{fontSize:18,fontWeight:800}},"Пациенты"),
+    h("button",{cls:"btn bp bsm",onclick:()=>{SCR.sub="addpat";render();}},"+ Добавить"));
+  const inp=h("input",{cls:"fi",placeholder:"Поиск...",sty:{marginBottom:14}});
+  const lst=h("div",{});
+  function draw(q){
+    lst.innerHTML="";
+    const fl=(q?S.patients.filter(p=>p.name.toLowerCase().includes(q.toLowerCase())||p.phone.includes(q)):[...S.patients]).sort((a,b)=>b.createdAt.localeCompare(a.createdAt));
+    if(!fl.length){lst.appendChild(h("div",{cls:"emp"},h("div",{cls:"empi"},"👤"),h("div",{},"Нет пациентов")));return;}
+    fl.forEach(p=>lst.appendChild(patCard(p,()=>{SCR.sub="pat";SCR.editId=p.id;render();})));
+  }
+  inp.addEventListener("input",e=>draw(e.target.value));draw("");
+  wrap.appendChild(hd);wrap.appendChild(inp);wrap.appendChild(lst);return wrap;
+}
+
+// ===================== WEB =====================
+function renderWeb(){
+  const wd=wDates(14);if(!SCR.schDate||!wd.includes(SCR.schDate))SCR.schDate=wd[0];
+  const wrap=h("div",{sty:{display:"flex",flexDirection:"column",minHeight:"100vh"}});
+  wrap.appendChild(h("header",{cls:"hdr"},h("div",{},h("div",{cls:"ht"},"🌐 Команда сайта"),h("div",{cls:"hs"},"doctorvoinov.ru")),h("button",{cls:"hb",onclick:()=>{S.session=null;saveCfg();render();}},"Выход")));
+  wrap.appendChild(mkSyncBar());
+  const tFr=(S.schedule[today()]?.slots||[]).filter(s=>s.available).length;
+  const tAll=(S.schedule[today()]?.slots||[]).length;
+  const scr=h("div",{cls:"scr",sty:{paddingBottom:16}});
+  scr.appendChild(h("div",{cls:"card",sty:{background:"var(--p)",border:"none",color:"#fff",marginBottom:16}},
+    h("div",{sty:{fontSize:12,opacity:.75}},"Свободных слотов сегодня"),
+    h("div",{sty:{fontSize:38,fontWeight:800,margin:"4px 0"}},tFr),
+    h("div",{sty:{fontSize:12,opacity:.6}},"из "+tAll+" всего")
+  ));
+  const dr=h("div",{cls:"dr"});const slW=h("div",{cls:"card",sty:{marginTop:14}});
+  function bld(){
+    dr.innerHTML="";slW.innerHTML="";
+    wd.forEach(d=>{const dd=new Date(d);const fr=(S.schedule[d]?.slots||[]).filter(s=>s.available).length;
+      const b=h("button",{cls:"dc"+(d===SCR.schDate?" on":""),onclick:()=>{SCR.schDate=d;bld();}},h("span",{cls:"dsb"},dd.toLocaleDateString("ru-RU",{weekday:"short"})),dd.getDate(),h("span",{cls:"dsb",sty:{color:d===SCR.schDate?"rgba(255,255,255,.8)":"var(--p)"}},fr+" св."));
+      dr.appendChild(b);
+    });
+    slW.appendChild(h("div",{sty:{fontWeight:700,marginBottom:10}},fmtF(SCR.schDate)));
+    const sw=h("div",{sty:{display:"flex",flexWrap:"wrap"}});
+    (S.schedule[SCR.schDate]?.slots||[]).forEach(s=>sw.appendChild(h("div",{cls:"slt "+(s.available?"fr":"bk")},s.time,s.clinic?h("div",{cls:"slt-name"},s.clinic):null)));
+    slW.appendChild(sw);
+  }
+  bld();
+  const apiBtn=h("button",{cls:"btn bs bw",sty:{marginTop:12}},"{ } JSON API");
+  const apiB=h("div",{cls:"card",sty:{marginTop:10,display:"none"}});
+  apiBtn.onclick=()=>{
+    const shown=apiB.style.display!=="none";apiB.style.display=shown?"none":"block";apiBtn.textContent=shown?"{ } JSON API":"Скрыть";
+    if(!shown){const data={};wd.forEach(d=>{const sl=(S.schedule[d]?.slots||[]).filter(s=>s.available).map(s=>({time:s.time,clinic:s.clinic||""}));data[d]={available_slots:sl,count:sl.length};});apiB.innerHTML="";apiB.appendChild(h("pre",{sty:{fontSize:11,overflowX:"auto",background:"#F5F4F0",padding:12,borderRadius:8,color:"#333",maxHeight:280}},JSON.stringify(data,null,2)));}
+  };
+  [h("div",{cls:"st"},"По датам"),dr,slW,apiBtn,apiB].forEach(e=>scr.appendChild(e));
+  if(S._previewFrom){
+    wrap.insertBefore(h("div",{sty:{background:"#1A1A1A",color:"#fff",padding:"9px 18px",display:"flex",alignItems:"center",justifyContent:"space-between",fontSize:13}},
+      h("span",{},"👁 Просмотр: "+ROLES[S.session.role]),
+      h("button",{sty:{background:"var(--p)",border:"none",color:"#fff",padding:"5px 14px",borderRadius:7,cursor:"pointer",fontFamily:"inherit",fontSize:12,fontWeight:700},onclick:()=>{S.session={...S.session,role:S._previewFrom};S._previewFrom=null;render();}},"← Назад в Admin")
+    ),wrap.firstChild);
+  }
+  wrap.appendChild(scr);return wrap;
+}
+
+// ===================== INIT =====================
+window.addEventListener("focus",()=>{if(S.apiUrl&&!S.loading)loadData().then(()=>updateSyncBars());});
+setInterval(()=>{if(S.apiUrl&&!S.loading&&S.session)loadData().then(()=>updateSyncBars());},60000);
+loadCfg();
+if(!S.apiUrl){render();}
+else{loadData().then(()=>{if(!S.session){render();return;}const u=S.users.find(x=>x.id===S.session.userId&&x.active!==false);if(!u){S.session=null;saveCfg();}render();});}
+</script>
+</body>
+</html>
