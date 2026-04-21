@@ -226,12 +226,12 @@ function getMonday(ds){
 function copyScheduleByWeek(srcDate,tFrom,tTo){
   const srcMon=getMonday(srcDate);
   const srcByDow={};
-  for(let i=0;i<7;i++){const d=new Date(srcMon+"T12:00:00");d.setDate(d.getDate()+i);const ds=d.toISOString().split("T")[0];const dow=d.getDay();if(dow!==0&&dow!==6)srcByDow[dow]=S.schedule[ds]||{blocks:[],slots:[]};}
+  for(let i=0;i<7;i++){const d=new Date(srcMon+"T12:00:00");d.setDate(d.getDate()+i);const ds=d.toISOString().split("T")[0];const dow=d.getDay();srcByDow[dow]=S.schedule[ds]||{blocks:[],slots:[]};}
   const ns={...S.schedule};let count=0;
   const cur=new Date(tFrom+"T12:00:00");const end=new Date(tTo+"T12:00:00");
   while(cur<=end){
     const dow=cur.getDay();const ds=cur.toISOString().split("T")[0];
-    if(dow!==0&&dow!==6&&srcByDow[dow]?.blocks?.length){
+    if(srcByDow[dow]?.blocks?.length){
       const src=srcByDow[dow];
       const newBlocks=src.blocks.map(b=>({...b,id:uid()}));
       let newSlots=[];newBlocks.forEach(b=>newSlots=[...newSlots,...generateSlots(b)]);
@@ -390,7 +390,8 @@ function patCard(p,onClick){
 // ===================== PATIENT DETAIL =====================
 function renderPatDetail(p,role,onBack){
   if(!p)return h("div",{},"Пациент не найден");
-  let curTab=SCR.openTaskId?"tasks":"info";
+  let curTab=SCR.openTaskId?"tasks":(SCR.openEdit||role==="doctor"||role==="admin")?"edit":"info";
+  SCR.openEdit=false;
   const tbEl=h("div",{cls:"tabs"});
   const cEl=h("div",{});
   const activeCnt=(p.tasks||[]).filter(t=>!t.completed).length;
@@ -694,8 +695,8 @@ function showBookingModal(p){
 }
 
 // ===================== SCHEDULE =====================
-function wDates(n){const r=[];for(let i=0;i<60;i++){const d=new Date();d.setDate(d.getDate()+i);if(d.getDay()!==0&&d.getDay()!==6)r.push(d.toISOString().split("T")[0]);if(r.length>=(n||14))break;}return r;}
-function getMonthDates(yr,mo){const r=[];const d=new Date(yr,mo,1);while(d.getMonth()===mo){if(d.getDay()!==0&&d.getDay()!==6)r.push(d.toISOString().split("T")[0]);d.setDate(d.getDate()+1);}return r;}
+function wDates(n){const r=[];for(let i=0;i<60;i++){const d=new Date();d.setDate(d.getDate()+i);r.push(d.toISOString().split("T")[0]);if(r.length>=(n||14))break;}return r;}
+function getMonthDates(yr,mo){const r=[];const d=new Date(yr,mo,1);while(d.getMonth()===mo){r.push(d.toISOString().split("T")[0]);d.setDate(d.getDate()+1);}return r;}
 
 function renderSchedule(role){
   if(SCR.schYear===undefined){const n=new Date();SCR.schYear=n.getFullYear();SCR.schMonth=n.getMonth();}
@@ -752,7 +753,7 @@ function renderSchedule(role){
       const slots=S.schedule[ds]?.slots||[];
       const fr=slots.filter(s=>s.available).length;
       const tot=slots.length;
-      const inactive=isWknd||isPast;
+      const inactive=isPast; // weekends are now allowed
       const cell=h("div",{sty:{
         padding:"6px 2px",borderRadius:"8px",textAlign:"center",
         cursor:inactive?"default":"pointer",
@@ -761,7 +762,7 @@ function renderSchedule(role){
         border:isTdy&&!isSel?"1.5px solid var(--p)":"1.5px solid transparent",
         transition:"background .1s"
       }},
-        h("div",{sty:{fontSize:13,fontWeight:700,color:isSel?"#fff":isPast?"var(--hi)":"var(--tx)"}},day),
+        h("div",{sty:{fontSize:13,fontWeight:700,color:isSel?"#fff":isPast?"var(--hi)":isWknd?"var(--a)":"var(--tx)"}},day),
         h("div",{sty:{fontSize:9,fontWeight:600,color:isSel?"rgba(255,255,255,.7)":tot>0?"var(--p)":"transparent",marginTop:1}},tot>0?fr+"/"+tot:"·")
       );
       if(!inactive){cell.onclick=()=>{SCR.schDate=ds;rebSlots();};}
@@ -989,7 +990,7 @@ function renderSchedule(role){
       const srcMon=getMonday(srcI.value);
       let count=0;const cur=new Date(fromI.value+"T12:00:00");const end=new Date(toI.value+"T12:00:00");
       while(cur<=end){const dow=cur.getDay();const ds=cur.toISOString().split("T")[0];
-        if(dow!==0&&dow!==6){const srcD=new Date(srcMon+" ");srcD.setDate(srcD.getDate()+(dow===0?6:dow-1));const sds=srcD.toISOString().split("T")[0];if(S.schedule[sds]?.blocks?.length)count++;}
+        {const srcD=new Date(srcMon+"T12:00:00");srcD.setDate(srcD.getDate()+(dow===0?6:dow-1));const sds=srcD.toISOString().split("T")[0];if(S.schedule[sds]?.blocks?.length)count++;}
         cur.setDate(cur.getDate()+1);}
       previewEl.textContent="Будет скопировано блоков на "+count+" рабочих дней";
     }
@@ -1250,7 +1251,7 @@ function docDash(todaySl,needC,upOps,td,reb){
   ));
   if(todaySl.length){
     wrap.appendChild(h("div",{cls:"st"},"Приёмы сегодня"));
-    todaySl.forEach(s=>wrap.appendChild(h("div",{cls:"crow",onclick:()=>{SCR.editId=s.patientId;reb();}},
+    todaySl.forEach(s=>wrap.appendChild(h("div",{cls:"crow",onclick:()=>{SCR.openEdit=true;SCR.editId=s.patientId;reb();}},
       h("div",{sty:{fontWeight:800,fontSize:16,color:"var(--p)",width:44,textAlign:"center",flexShrink:0}},s.time),
       h("div",{},h("div",{sty:{fontWeight:600}},s.patientName),
         s.serviceName?h("div",{sty:{fontSize:12,color:"var(--mu)"}},s.serviceName+(s.clinic?" · "+s.clinic:"")):null)
@@ -1258,13 +1259,13 @@ function docDash(todaySl,needC,upOps,td,reb){
   }
   if(needC.length){
     wrap.appendChild(h("div",{cls:"st",sty:{color:"#D97706"}},"⚠️ Требуют контакта"));
-    needC.forEach(p=>wrap.appendChild(h("div",{cls:"card",sty:{borderLeft:"3px solid #D97706",cursor:"pointer",padding:"10px 14px"},onclick:()=>{SCR.editId=p.id;reb();}},
+    needC.forEach(p=>wrap.appendChild(h("div",{cls:"card",sty:{borderLeft:"3px solid #D97706",cursor:"pointer",padding:"10px 14px"},onclick:()=>{SCR.openEdit=true;SCR.editId=p.id;reb();}},
       h("div",{sty:{fontWeight:600}},p.name),h("div",{sty:{fontSize:12,color:"var(--mu)"}},"📞 "+p.phone+" · "+fmtD(p.nextContact))
     )));
   }
   if(upOps.length){
     wrap.appendChild(h("div",{cls:"st"},"Предстоящие операции"));
-    upOps.slice(0,6).forEach(p=>wrap.appendChild(h("div",{cls:"crow",onclick:()=>{SCR.editId=p.id;reb();}},
+    upOps.slice(0,6).forEach(p=>wrap.appendChild(h("div",{cls:"crow",onclick:()=>{SCR.openEdit=true;SCR.editId=p.id;reb();}},
       h("div",{},h("div",{sty:{fontWeight:600}},p.name),h("div",{sty:{fontSize:12,color:"var(--mu)"}},"🗓 "+(p.opDate?fmtD(p.opDate):p.opDateText||"—")+(p.opPrice?" · "+Number(p.opPrice).toLocaleString("ru-RU")+" ₽":"")))
     )));
   }
@@ -1291,7 +1292,7 @@ function docPats(td,reb){
     const tbl=h("table",{cls:"tbl"});
     tbl.appendChild(h("thead",{},h("tr",{},h("th",{},"Пациент"),h("th",{},"Статус"),h("th",{},"Операция"),h("th",{},"Цена"),h("th",{},"Контакт"))));
     const tb=h("tbody",{});
-    fl.forEach(p=>{const s=ST[p.status];tb.appendChild(h("tr",{onclick:()=>{SCR.editId=p.id;reb();}},
+    fl.forEach(p=>{const s=ST[p.status];tb.appendChild(h("tr",{onclick:()=>{SCR.openEdit=true;SCR.editId=p.id;reb();}},
       h("td",{},h("div",{sty:{fontWeight:600}},p.name),h("div",{sty:{fontSize:11,color:"#6B7280"}},p.phone+(p.birthDate?" · "+ageLabel(p.birthDate):""))),
       h("td",{},h("span",{cls:"tag",sty:{background:(s?.c||"#ccc")+"22",color:s?.c}},s?.l)),
       h("td",{},p.opDate?fmtD(p.opDate):(p.opDateText||"—")),
