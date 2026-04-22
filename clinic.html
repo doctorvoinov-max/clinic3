@@ -99,7 +99,7 @@ textarea.fi{min-height:72px;resize:vertical;font-size:14px}
 .overlay{position:fixed;inset:0;background:rgba(0,0,0,.5);z-index:100;display:flex;align-items:flex-end;justify-content:center}
 .modal{background:#fff;border-radius:20px 20px 0 0;padding:20px 18px 36px;width:100%;max-width:620px;max-height:90vh;overflow-y:auto}
 .badge{display:inline-block;padding:1px 7px;border-radius:12px;font-size:10px;font-weight:700;margin-left:6px}
-.syncbar-warn{color:var(--a)!important}
+.syncbar-warn{color:var(--a)!important}.loader{min-height:100vh;display:flex;align-items:center;justify-content:center;font-size:18px;color:var(--mu)}
 @media(max-width:600px){.tbl th:nth-child(4),.tbl td:nth-child(4),.tbl th:nth-child(5),.tbl td:nth-child(5){display:none}.datefield{grid-template-columns:1fr}}
 </style>
 </head>
@@ -110,7 +110,7 @@ textarea.fi{min-height:72px;resize:vertical;font-size:14px}
 const CFG="voinov_cfg3", TK="voinov2026clinic";
 const KEYS={patients:"A1",schedule:"B1",users:"C1",services:"D1"};
 
-let S={apiUrl:"",session:null,patients:[],schedule:{},users:[],services:[],sync:"ok",loading:false};
+let S={apiUrl:"",session:null,patients:[],schedule:{},users:[],services:[],sync:"ok",loading:false,_lastSaveMs:0};
 
 function loadCfg(){
   try{
@@ -171,6 +171,7 @@ async function apiSend(key,value){
 let saveTimer=null;
 let _pendingKeys=new Set();
 function triggerSave(keys){
+  S._lastSaveMs=Date.now();
   S.sync="saving";updateSyncBars();
   keys.forEach(k=>_pendingKeys.add(k));
   if(keys.includes("patients"))cacheSet("patients",S.patients);
@@ -188,7 +189,7 @@ function triggerSave(keys){
     _pendingKeys.delete("patients");
     _pendingKeys.delete("schedule");
     S.sync="ok";updateSyncBars();
-  },3000);
+  },10000);
 }
 let lastSyncTime=null;
 function updateSyncBars(){
@@ -202,12 +203,13 @@ function updateSyncBars(){
 }
 async function loadData(){
   if(!S.apiUrl)return;
+  // Capture current displayed state BEFORE any updates
+  const prevP=JSON.stringify(S.patients);
+  const prevS=JSON.stringify(S.schedule);
+  const prevU=JSON.stringify(S.users);
   ["patients","schedule","users","services"].forEach(k=>{const c=cacheGet(k);if(c){if(k==="patients")S.patients=c;else if(k==="schedule")S.schedule=migrateSchedule(c);else if(k==="users")S.users=c;else if(k==="services")S.services=c;}});
   try{
     const[p,s,u,sv]=await Promise.all([apiGet("patients"),apiGet("schedule"),apiGet("users"),apiGet("services")]);
-    const prevP=JSON.stringify(S.patients);
-    const prevS=JSON.stringify(S.schedule);
-    const prevU=JSON.stringify(S.users);
     // Don't overwrite keys that have pending local changes
     if(Array.isArray(p)&&!_pendingKeys.has("patients"))S.patients=p;
     else if(Array.isArray(p)&&_pendingKeys.has("patients")){/* keep local version */}
@@ -220,8 +222,9 @@ async function loadData(){
     resolveRole();
     // Re-render if ANY data changed
     const changed=JSON.stringify(S.patients)!==prevP||JSON.stringify(S.schedule)!==prevS||JSON.stringify(S.users)!==prevU;
-    // Only re-render from background load if no pending local writes
-    if(changed&&S.session&&S.session.role!=="__pending__"&&_pendingKeys.size===0)render();
+    // Only re-render if no pending writes AND enough time passed since last save
+    const safeTorerender=_pendingKeys.size===0&&(Date.now()-S._lastSaveMs>10000);
+    if(changed&&S.session&&S.session.role!=="__pending__"&&safeTorerender)render();
   }catch{S.sync="err";}
 }
 function migrateSchedule(sch){
@@ -250,7 +253,7 @@ function fmtPrice(price,clinic){if(!price)return"—";const n=Number(price).toLo
 const ROLES={admin:"Администратор",doctor:"Врач",assistant:"Ассистент",web:"Команда сайта"};
 
 function autoStatus(p){
-  if(p.status==="completed")return"completed";
+  if(["completed","cancelled","followup","operated"].includes(p.status))return p.status;
   if(p.opDate||p.opDateText){if(["new","scheduled","consulted"].includes(p.status))return"preop";}
   if(p.outcome&&["new","scheduled"].includes(p.status))return"consulted";
   return p.status;
@@ -334,7 +337,10 @@ function renderApp(){
   if(S.session.role==="__pending__"){
     if(S.users.length){resolveRole();}
     if(!S.session||S.session.role==="__pending__"){
-      app.appendChild(h("div",{cls:"loader"},"⏳ Загрузка..."));return;
+      app.appendChild(h("div",{cls:"loader"},"⏳ Загрузка..."));
+      // Trigger a data load if we're stuck in pending
+      if(!S.loading)loadData().then(()=>render());
+      return;
     }
   }
   resolveRole();
@@ -456,7 +462,7 @@ function patCard(p,onClick){
     h("div",{cls:"av"},(p.name||"?")[0]),
     h("div",{sty:{flex:1}},
       h("div",{sty:{fontWeight:700,fontSize:14}},p.name),
-      h("div",{sty:{fontSize:12,color:"var(--mu)"}},"📋 "+p.phone+(p.birthDate?" · "+ageLabel(p.birthDate):"")),
+      h("div",{sty:{fontSize:12,color:"var(--mu)"}},(p.phone?"📋 "+p.phone+(p.birthDate?" · "+ageLabel(p.birthDate):""):p.birthDate?ageLabel(p.birthDate):"")),
       h("span",{cls:"tag",sty:{display:"inline-block",marginTop:3,background:(s?.c||"#ccc")+"22",color:s?.c||"#666"}},s?.l||p.status)
     ),h("span",{sty:{color:"var(--mu)",fontSize:20}},"›")
   );
@@ -465,7 +471,7 @@ function patCard(p,onClick){
 // ===================== PATIENT DETAIL =====================
 function renderPatDetail(p,role,onBack){
   if(!p)return h("div",{},"Пациент не найден");
-  let curTab=SCR.openTaskId?"tasks":(SCR.openEdit||role==="doctor"||role==="admin")?"edit":"info";
+  let curTab=SCR.openTaskId?"tasks":SCR.openEdit?"edit":"info";
   SCR.openEdit=false;
   const tbEl=h("div",{cls:"tabs"});
   const cEl=h("div",{});
@@ -489,7 +495,7 @@ function renderPatDetail(p,role,onBack){
       h("div",{cls:"av",sty:{width:50,height:50,fontSize:20}},(p.name||"?")[0]),
       h("div",{sty:{flex:1}},
         h("div",{sty:{fontSize:18,fontWeight:800}},p.name),
-        h("div",{sty:{fontSize:13,color:"var(--mu)"}},"📋 "+p.phone+(p.birthDate?" · "+ageLabel(p.birthDate):""))
+        h("div",{sty:{fontSize:13,color:"var(--mu)"}},(p.phone?"📋 "+p.phone+(p.birthDate?" · "+ageLabel(p.birthDate):""):p.birthDate?ageLabel(p.birthDate):""))
       )
     ),
     role!=="web"?h("button",{cls:"btn bp bw",sty:{marginBottom:12},onclick:()=>showBookingModal(p)},"📅 Записать на приём"):null,
@@ -741,7 +747,7 @@ function showBookingModal(p){
     allDays.forEach(dd=>{
       const dobj=new Date(dd);
       const fr=(S.schedule[dd]?.slots||[]).filter(s=>s.available).length;
-      const btn=h("button",{cls:"dc"+(dd===selDate?" on":""),onclick:()=>{selDate=dd;selSlot=null;rebSlots();rebBook();}},
+      const btn=h("button",{cls:"dc"+(dd===selDate?" on":""),"data-date":dd,onclick:()=>{selDate=dd;selSlot=null;rebSlots();rebBook();}},
         h("span",{cls:"dsb"},dobj.toLocaleDateString("ru-RU",{weekday:"short"})),dobj.getDate(),
         h("span",{cls:"dsb",sty:{color:dd===selDate?"rgba(255,255,255,.75)":"var(--p)"}},fr>0?fr+" св.":"—")
       );
@@ -755,25 +761,17 @@ function showBookingModal(p){
   const slotArea=h("div",{cls:"fg"},h("label",{cls:"fl"},"Время"));
   body.appendChild(slotArea);
   function rebSlots(){
-    // update date strip active state
+    // Sync active state on date strip without full rebuild
     dateStrip.querySelectorAll(".dc").forEach(b=>{
-      const dd=b.onclick?.toString(); // can't read easily, use textContent trick
-    });
-    dateStrip.innerHTML="";
-    const allDays2=[];const d2=new Date(schYr,schMo,1);
-    while(d2.getMonth()===schMo){allDays2.push(localDateStr(d2));d2.setDate(d2.getDate()+1);}
-    allDays2.forEach(dd=>{
-      const dobj=new Date(dd);
-      const fr=(S.schedule[dd]?.slots||[]).filter(s=>s.available).length;
-      const btn=h("button",{cls:"dc"+(dd===selDate?" on":""),onclick:()=>{selDate=dd;selSlot=null;rebSlots();rebBook();}},
-        h("span",{cls:"dsb"},dobj.toLocaleDateString("ru-RU",{weekday:"short"})),dobj.getDate(),
-        h("span",{cls:"dsb",sty:{color:dd===selDate?"rgba(255,255,255,.75)":"var(--p)"}},fr>0?fr+" св.":"—")
-      );
-      dateStrip.appendChild(btn);
+      const dd=b.getAttribute("data-date");
+      if(dd){b.className="dc"+(dd===selDate?" on":"");}
+      const sub=b.querySelector("span:last-child");
+      if(sub&&dd){const fr=(S.schedule[dd]?.slots||[]).filter(s=>s.available).length;sub.textContent=fr>0?fr+" св.":"—";sub.style.color=dd===selDate?"rgba(255,255,255,.75)":"var(--p)";}
     });
     const nowHHMM=(()=>{const n=new Date();return String(n.getHours()).padStart(2,"0")+":"+String(n.getMinutes()).padStart(2,"0");})();
     const slots=(S.schedule[selDate]?.slots||[]).filter(s=>s.available&&(selDate!==today()||s.time>=nowHHMM));
     slotArea.innerHTML="";slotArea.appendChild(h("label",{cls:"fl"},"Время"));
+    slotArea.scrollIntoView&&slotArea.scrollIntoView({behavior:"smooth",block:"nearest"});
     if(!slots.length){slotArea.appendChild(h("div",{sty:{fontSize:13,color:"var(--mu)",padding:"8px 0"}},"Нет свободных слотов на эту дату"));return;}
     const grid=h("div",{sty:{display:"flex",flexWrap:"wrap"}});
     slots.forEach(s=>{
@@ -928,6 +926,7 @@ function renderSchedule(role){
         h("div",{sty:{fontSize:13,fontWeight:700,color:isSel?"#fff":isPast?"var(--hi)":isWknd?"var(--a)":"var(--tx)"}},day),
         h("div",{sty:{fontSize:9,fontWeight:600,color:isSel?"rgba(255,255,255,.7)":tot>0?"var(--p)":"transparent",marginTop:1}},tot>0?fr+"/"+tot:"·")
       );
+      if(isTdy)cell.setAttribute("data-today","1");
       if(!inactive){cell.onclick=()=>{SCR.schDate=ds;rebSlots();};}
       grid.appendChild(cell);
     }
@@ -1038,9 +1037,10 @@ function renderSchedule(role){
             // Update patient status to cancelled if they were just scheduled
             if(s.patientId){
               S.patients=S.patients.map(pr=>pr.id!==s.patientId?pr:{...pr,status:pr.status==="scheduled"?"cancelled":pr.status});
-              cacheSet("patients",S.patients);apiPost("patients",S.patients);
+              triggerSave(["patients","schedule"]);
+            } else {
+              triggerSave(["schedule"]);
             }
-            cacheSet("schedule",S.schedule);apiPost("schedule",S.schedule);_pendingKeys.delete("schedule");
             rebSlots();
           }},"Освободить"),
           h("button",{cls:"btn bs",onclick:()=>detWrap.innerHTML=""},"✕")
@@ -1054,7 +1054,7 @@ function renderSchedule(role){
           // Patient selector
           const patSel=h("select",{cls:"fi"});
           patSel.appendChild(h("option",{value:""},"— Выберите пациента —"));
-          [...S.patients].sort((a,b)=>a.name.localeCompare(b.name)).forEach(p=>{const o=h("option",{value:p.id},p.name+" · "+p.phone);if(selPat?.id===p.id)o.selected=true;patSel.appendChild(o);});
+          [...S.patients].sort((a,b)=>a.name.localeCompare(b.name)).forEach(p=>{const o=h("option",{value:p.id},p.name+(p.phone?" · "+p.phone:""));if(selPat?.id===p.id)o.selected=true;patSel.appendChild(o);});
           patSel.appendChild(h("option",{value:"__new__"},"+ Создать нового пациента..."));
           patSel.onchange=e=>{if(e.target.value==="__new__"){showNewPat=true;selPat=null;}else{selPat=S.patients.find(p=>p.id===e.target.value)||null;showNewPat=false;}rebBook();};
           bookWrap.appendChild(h("div",{cls:"fg"},h("label",{cls:"fl"},"Пациент"),patSel));
@@ -1067,10 +1067,9 @@ function renderSchedule(role){
               h("button",{cls:"btn bs bsm",sty:{marginTop:8},onclick:async()=>{
                 if(!nN.value.trim())return;
                 const np={id:uid(),name:nN.value.trim(),phone:nP.value.trim(),source:"other",birthDate:"",complaint:"",tasks:[],notes:[],createdAt:new Date().toISOString(),status:"new"};
-                // Save immediately to API (not debounced) so patient exists before booking
+                // Save immediately and set pending guard
                 S.patients=[...S.patients,np];
-                cacheSet("patients",S.patients);
-                apiPost("patients",S.patients);
+                triggerSave(["patients"]);
                 selPat=np;showNewPat=false;rebBook();
               }},"Создать и выбрать")
             ));
@@ -1109,10 +1108,7 @@ function renderSchedule(role){
             const upSlot={...s,available:false,patientId:selPat.id,patientName:selPat.name,serviceId:selSvc.id,serviceName:selSvc.name,serviceDuration:dur};
             S.patients=S.patients.map(pr=>pr.id!==selPat.id?pr:{...pr,status:pr.status==="new"?"scheduled":pr.status});
             S.schedule={...S.schedule,[SCR.schDate]:{...S.schedule[SCR.schDate],slots:(S.schedule[SCR.schDate]?.slots||[]).map(sl=>sl.id!==s.id?sl:upSlot)}};
-            cacheSet("patients",S.patients);apiPost("patients",S.patients);
-            cacheSet("schedule",S.schedule);apiPost("schedule",S.schedule);
-            _pendingKeys.delete("patients");_pendingKeys.delete("schedule");
-            S.sync="ok";setTimeout(()=>updateSyncBars(),100);
+            triggerSave(["patients","schedule"]);
             detWrap.innerHTML="";rebSlots();
           }},canBook?"✓ Записать на приём":"Выберите пациента и услугу");
           bookBtn.disabled=!canBook;
@@ -1404,7 +1400,7 @@ function renderAdminUsers(reb){
   const form=h("div",{cls:"card",sty:{marginTop:8,display:"none"}});
   const nI=h("input",{cls:"fi",placeholder:"Имя пользователя"});
   const eI=h("input",{cls:"fi",type:"email",placeholder:"login@example.com"});
-  const pI=h("input",{cls:"fi",type:"text",placeholder:"Пароль (мин. 4 символа)"});
+  const pI=h("input",{cls:"fi",type:"text",placeholder:"Пароль (при редактировании — для смены, иначе оставьте пустым)"});
   const rSel=h("select",{cls:"fi"});
   [["assistant","Ассистент"],["doctor","Врач"],["web","Команда сайта"],["admin","Администратор"]].forEach(([k,v])=>rSel.appendChild(h("option",{value:k},v)));
   const formTitle=h("div",{sty:{fontWeight:700,marginBottom:10}},"Новый пользователь");
@@ -1462,6 +1458,7 @@ function renderAdminUsers(reb){
       if(!u)return;
       editUserId=uid;nI.value=u.name;eI.value=u.email;
       rSel.value=u.role;pI.value="";formTitle.textContent="Редактировать: "+u.name;
+      submitBtn.textContent="Сохранить";
       showF=true;rebF();form.scrollIntoView({behavior:"smooth",block:"nearest"});
     };
   });
@@ -1546,8 +1543,16 @@ function renderDoctor(){
     [{r:"doctor",i:"👨‍⚕️",l:"Врач"},{r:"assistant",i:"📱",l:"Ассистент"},{r:"web",i:"🌐",l:"Команда сайта"}].forEach(({r,i,l})=>{
       prvMenu.appendChild(h("button",{cls:"si",onclick:()=>{prvMenu.style.display="none";S._previewFrom=S.session.role;S.session={...S.session,role:r};SCR.tab="today";SCR.sub=null;render();}},h("span",{},i)," "+l));
     });
-    prvBtn.onclick=e=>{e.stopPropagation();prvMenu.style.display=prvMenu.style.display==="none"?"block":"none";};
-    document.addEventListener("click",()=>{prvMenu.style.display="none";},{once:false});
+    prvBtn.onclick=e=>{
+      e.stopPropagation();
+      const isOpen=prvMenu.style.display!=="none";
+      prvMenu.style.display=isOpen?"none":"block";
+      if(!isOpen){
+        // Close on next outside click
+        const closeHandler=()=>{prvMenu.style.display="none";};
+        setTimeout(()=>document.addEventListener("click",closeHandler,{once:true}),0);
+      }
+    };
     const prvWrap=h("div",{sty:{position:"relative"}},prvBtn,prvMenu);
     footer.appendChild(prvWrap);
   }
@@ -1782,8 +1787,10 @@ function renderPatsTab(){
     h("div",{sty:{fontSize:18,fontWeight:800}},"Пациенты"),
     h("button",{cls:"btn bp bsm",onclick:()=>{SCR.sub="addpat";render();}},"+ Добавить"));
   const inp=h("input",{cls:"fi",placeholder:"Поиск...",sty:{marginBottom:14}});
+  inp.value=SCR._patSearch||"";
   const lst=h("div",{});
   function draw(q){
+    SCR._patSearch=q;
     lst.innerHTML="";
     const fl=(q?S.patients.filter(p=>p.name.toLowerCase().includes(q.toLowerCase())||(p.phone||"").includes(q)):[...S.patients]).sort((a,b)=>b.createdAt.localeCompare(a.createdAt));
     if(!fl.length){lst.appendChild(h("div",{cls:"emp"},h("div",{cls:"empi"},"👤"),h("div",{},"Нет пациентов")));return;}
@@ -1795,7 +1802,7 @@ function renderPatsTab(){
 
 // ===================== WEB =====================
 function renderWeb(){
-  const wd=wDates(14);if(!SCR.schDate||!wd.includes(SCR.schDate))SCR.schDate=wd[0];
+  const wd=wDates(21);if(!SCR.schDate||!wd.includes(SCR.schDate))SCR.schDate=wd[0]||today();
   const wrap=h("div",{sty:{display:"flex",flexDirection:"column",minHeight:"100vh"}});
   wrap.appendChild(h("header",{cls:"hdr"},h("div",{},h("div",{cls:"ht"},"🌐 Команда сайта"),h("div",{cls:"hs"},"doctorvoinov.ru")),h("button",{cls:"hb",onclick:()=>{S.session=null;saveCfg();render();}},"Выход")));
   wrap.appendChild(mkSyncBar());
@@ -1845,7 +1852,8 @@ window.addEventListener("focus",()=>{
   });
 });
 setInterval(()=>{
-  if(S.apiUrl&&!S.loading&&S.session&&_pendingKeys.size===0)
+  const okToRefresh=_pendingKeys.size===0&&(Date.now()-S._lastSaveMs>10000);
+  if(S.apiUrl&&!S.loading&&S.session&&okToRefresh)
     loadData().then(()=>{updateSyncBars();render();});
 },15000);
 loadCfg();
