@@ -58,11 +58,27 @@ textarea.fi{min-height:72px;resize:vertical;font-size:14px}
 .syncbar{padding:5px 16px;display:flex;align-items:center;justify-content:space-between;font-size:12px}
 .syncbar.ok{background:#E8F5F2;color:#059669}.syncbar.saving{background:#FEF3E2;color:#C9720A}.syncbar.err{background:#FEF2F2;color:#DC2626}
 .syncbar button{background:none;border:1px solid currentColor;font-size:11px;cursor:pointer;color:inherit;font-family:inherit;padding:2px 6px;border-radius:4px}
-.desktop{display:flex;min-height:100vh}
-.sb{width:200px;background:#fff;border-right:1px solid var(--bd);padding:16px 10px;display:flex;flex-direction:column;flex-shrink:0;position:sticky;top:0;height:100vh;overflow-y:auto}
-.si{display:flex;align-items:center;gap:10px;padding:9px 11px;border-radius:9px;cursor:pointer;color:var(--mu);font-size:14px;font-weight:600;margin-bottom:3px;border:none;background:none;width:100%;font-family:inherit;text-align:left}
+.desktop{display:flex;min-height:100vh;flex-direction:column}
+@media(min-width:700px){.desktop{flex-direction:row}}
+.sb{background:#fff;border-bottom:1px solid var(--bd);padding:10px 8px;display:flex;flex-direction:row;align-items:center;gap:2px;overflow-x:auto;scrollbar-width:none;-webkit-overflow-scrolling:touch;position:sticky;top:0;z-index:40;flex-shrink:0}
+.sb::-webkit-scrollbar{display:none}
+.sb-brand{display:none}
+.sb-footer{display:flex;flex-direction:row;gap:2px;margin-left:auto;flex-shrink:0}
+@media(min-width:700px){
+  .desktop{flex-direction:row}
+  .sb{width:200px;flex-direction:column;border-bottom:none;border-right:1px solid var(--bd);padding:16px 10px;height:100vh;position:sticky;top:0;overflow-y:auto;overflow-x:hidden;gap:0;align-items:stretch}
+  .sb-brand{display:block;margin-bottom:16px;padding-left:4px}
+  .sb-footer{flex-direction:column;margin-left:0;margin-top:auto;gap:0}
+}
+.si{display:flex;align-items:center;gap:6px;padding:8px 10px;border-radius:9px;cursor:pointer;color:var(--mu);font-size:12px;font-weight:600;border:none;background:none;font-family:inherit;text-align:left;white-space:nowrap;flex-shrink:0}
 .si:hover{background:var(--bg)}.si.on{background:var(--pll);color:var(--p)}
-.dmain{flex:1;padding:24px;overflow-y:auto;max-height:100vh}
+.si-lbl{display:none}
+@media(min-width:700px){
+  .si{font-size:14px;gap:10px;margin-bottom:3px;width:100%;padding:9px 11px}
+  .si-lbl{display:inline}
+}
+.dmain{flex:1;padding:16px;overflow-y:auto;padding-bottom:24px}
+@media(min-width:700px){.dmain{padding:24px;max-height:100vh}}
 .sg{display:grid;grid-template-columns:repeat(3,1fr);gap:10px;margin-bottom:20px}
 .sc{background:#fff;border-radius:12px;padding:14px 10px;text-align:center;border:1px solid var(--bd)}
 .sn{font-size:26px;font-weight:800;color:var(--p)}.sl{font-size:11px;color:var(--mu);margin-top:2px}
@@ -83,6 +99,7 @@ textarea.fi{min-height:72px;resize:vertical;font-size:14px}
 .overlay{position:fixed;inset:0;background:rgba(0,0,0,.5);z-index:100;display:flex;align-items:flex-end;justify-content:center}
 .modal{background:#fff;border-radius:20px 20px 0 0;padding:20px 18px 36px;width:100%;max-width:620px;max-height:90vh;overflow-y:auto}
 .badge{display:inline-block;padding:1px 7px;border-radius:12px;font-size:10px;font-weight:700;margin-left:6px}
+.syncbar-warn{color:var(--a)!important}
 @media(max-width:600px){.tbl th:nth-child(4),.tbl td:nth-child(4),.tbl th:nth-child(5),.tbl td:nth-child(5){display:none}.datefield{grid-template-columns:1fr}}
 </style>
 </head>
@@ -222,16 +239,16 @@ function mergeSlots(existing,newSlots){
 function getMonday(ds){
   const d=new Date(ds+"T12:00:00");const day=d.getDay();
   d.setDate(d.getDate()+(day===0?-6:1-day));
-  return d.toISOString().split("T")[0];
+  return localDateStr(d);
 }
 function copyScheduleByWeek(srcDate,tFrom,tTo){
   const srcMon=getMonday(srcDate);
   const srcByDow={};
-  for(let i=0;i<7;i++){const d=new Date(srcMon+"T12:00:00");d.setDate(d.getDate()+i);const ds=d.toISOString().split("T")[0];const dow=d.getDay();srcByDow[dow]=S.schedule[ds]||{blocks:[],slots:[]};}
+  for(let i=0;i<7;i++){const d=new Date(srcMon+"T12:00:00");d.setDate(d.getDate()+i);const ds=localDateStr(d);const dow=d.getDay();srcByDow[dow]=S.schedule[ds]||{blocks:[],slots:[]};}
   const ns={...S.schedule};let count=0;
   const cur=new Date(tFrom+"T12:00:00");const end=new Date(tTo+"T12:00:00");
   while(cur<=end){
-    const dow=cur.getDay();const ds=cur.toISOString().split("T")[0];
+    const dow=cur.getDay();const ds=localDateStr(cur);
     if(srcByDow[dow]?.blocks?.length){
       const src=srcByDow[dow];
       const newBlocks=src.blocks.map(b=>({...b,id:uid()}));
@@ -258,8 +275,16 @@ function h(tag,a,...kids){
   kids.flat(9).forEach(c=>{if(c==null||c===false)return;el.appendChild(typeof c==="string"||typeof c==="number"?document.createTextNode(String(c)):c);});
   return el;
 }
-function mkSyncBar(){
+function mkSyncBar(compact){
   const lbl={ok:"✓ Синхронизировано",saving:"⏳ Сохранение...",err:"⚠️ Данные в кэше"};
+  const lblShort={ok:"✓",saving:"⏳",err:"⚠️"};
+  if(compact){
+    // Icon-only for mobile sidebar
+    const btn=h("button",{cls:"si",title:lbl[S.sync],onclick:()=>loadData().then(()=>{updateSyncBars();render();})},
+      h("span",{sty:{fontSize:18}},lblShort[S.sync]),h("span",{cls:"si-lbl"},lbl[S.sync]));
+    btn.className="si syncbar-btn "+(S.sync==="ok"?"":"syncbar-warn");
+    return btn;
+  }
   return h("div",{cls:"syncbar "+S.sync},h("span",{cls:"synclbl"},lbl[S.sync]),h("button",{onclick:()=>loadData().then(render)},"🔄"));
 }
 function renderApp(){
@@ -578,7 +603,7 @@ function patEditForm(p,role,onSaved){
       }
       if(f.opDate&&f.opDate!==prev.opDate&&!hasTaskOnDate("confirm",f.opDate)){
         const d=new Date(f.opDate+"T12:00:00");d.setDate(d.getDate()-1);
-        const confirmDate=d.toISOString().split("T")[0];
+        const confirmDate=localDateStr(d);
         newTasks.push({id:uid(),type:"confirm",dueDate:confirmDate,description:"Подтвердить операцию "+fmtD(f.opDate),completed:false,createdAt:new Date().toISOString()});
       }
       if((f.outcome||f.doctorNote)&&(!prev.outcome&&!prev.doctorNote)){
@@ -663,7 +688,7 @@ function showBookingModal(p){
     dateLabel.textContent=new Date(schYr,schMo).toLocaleDateString("ru-RU",{month:"long",year:"numeric"});
     dateStrip.innerHTML="";
     const allDays=[];const d=new Date(schYr,schMo,1);
-    while(d.getMonth()===schMo){allDays.push(d.toISOString().split("T")[0]);d.setDate(d.getDate()+1);}
+    while(d.getMonth()===schMo){allDays.push(localDateStr(d));d.setDate(d.getDate()+1);}
     allDays.forEach(dd=>{
       const dobj=new Date(dd);
       const fr=(S.schedule[dd]?.slots||[]).filter(s=>s.available).length;
@@ -687,7 +712,7 @@ function showBookingModal(p){
     });
     dateStrip.innerHTML="";
     const allDays2=[];const d2=new Date(schYr,schMo,1);
-    while(d2.getMonth()===schMo){allDays2.push(d2.toISOString().split("T")[0]);d2.setDate(d2.getDate()+1);}
+    while(d2.getMonth()===schMo){allDays2.push(localDateStr(d2));d2.setDate(d2.getDate()+1);}
     allDays2.forEach(dd=>{
       const dobj=new Date(dd);
       const fr=(S.schedule[dd]?.slots||[]).filter(s=>s.available).length;
@@ -783,8 +808,9 @@ function showBookingModal(p){
 }
 
 // ===================== SCHEDULE =====================
-function wDates(n){const r=[];for(let i=0;i<60;i++){const d=new Date();d.setDate(d.getDate()+i);r.push(d.toISOString().split("T")[0]);if(r.length>=(n||14))break;}return r;}
-function getMonthDates(yr,mo){const r=[];const d=new Date(yr,mo,1);while(d.getMonth()===mo){r.push(d.toISOString().split("T")[0]);d.setDate(d.getDate()+1);}return r;}
+const localDateStr=d=>{const D=new Date(d);return D.getFullYear()+"-"+(String(D.getMonth()+1).padStart(2,"0"))+"-"+(String(D.getDate()).padStart(2,"0"));};
+function wDates(n){const r=[];const base=new Date();base.setHours(12,0,0,0);for(let i=0;i<60;i++){const d=new Date(base);d.setDate(d.getDate()+i);r.push(localDateStr(d));if(r.length>=(n||14))break;}return r;}
+function getMonthDates(yr,mo){const r=[];const d=new Date(yr,mo,1,12,0,0);while(d.getMonth()===mo){r.push(localDateStr(d));d.setDate(d.getDate()+1);}return r;}
 
 function renderSchedule(role){
   if(SCR.schYear===undefined){const n=new Date();SCR.schYear=n.getFullYear();SCR.schMonth=n.getMonth();}
@@ -834,7 +860,7 @@ function renderSchedule(role){
       const d=new Date(yr,mo,day);
       const dow=d.getDay();
       const isWknd=dow===0||dow===6;
-      const ds=d.toISOString().split("T")[0];
+      const ds=localDateStr(d);
       const isPast=ds<tdStr;
       const isSel=ds===SCR.schDate;
       const isTdy=ds===tdStr;
@@ -1093,44 +1119,200 @@ function renderSchedule(role){
   function showCopyModal(){
     let overlay;
     function close(){if(overlay?.parentNode)overlay.parentNode.removeChild(overlay);}
-    const srcI=h("input",{cls:"fi",type:"date",value:SCR.schDate});
-    const fromI=h("input",{cls:"fi",type:"date",value:SCR.schDate});
-    const toI=h("input",{cls:"fi",type:"date"});
-    // Default to end of month
-    const lastDay=new Date(SCR.schYear,SCR.schMonth+1,0);
-    toI.value=lastDay.toISOString().split("T")[0];
-    const previewEl=h("div",{sty:{fontSize:13,color:"var(--mu)",marginTop:8}});
-    function updatePreview(){
-      if(!srcI.value||!fromI.value||!toI.value||fromI.value>toI.value){previewEl.textContent="";return;}
-      const srcMon=getMonday(srcI.value);
-      let count=0;const cur=new Date(fromI.value+"T12:00:00");const end=new Date(toI.value+"T12:00:00");
-      while(cur<=end){const dow=cur.getDay();const ds=cur.toISOString().split("T")[0];
-        {const srcD=new Date(srcMon+"T12:00:00");srcD.setDate(srcD.getDate()+(dow===0?6:dow-1));const sds=srcD.toISOString().split("T")[0];if(S.schedule[sds]?.blocks?.length)count++;}
-        cur.setDate(cur.getDate()+1);}
-      previewEl.textContent="Будет скопировано блоков на "+count+" рабочих дней";
+
+    // ── Template blocks ───────────────────────────────────────────────────
+    // Start with current day's blocks as template, or empty
+    let tplBlocks=[...(S.schedule[SCR.schDate]?.blocks||[]).map(b=>({...b,id:uid()}))];
+    if(!tplBlocks.length) tplBlocks=[{id:uid(),fromTime:"09:00",toTime:"13:00",clinic:CLINICS[0],slotDuration:30}];
+
+    // ── Target: year/month + day-of-week checkboxes ────────────────────────
+    let tgtYear=SCR.schYear,tgtMonth=SCR.schMonth;
+    const DOW_RU=["Пн","Вт","Ср","Чт","Пт","Сб","Вс"];
+    // default: same dow as selected date
+    const selDow=(new Date(SCR.schDate+"T12:00:00").getDay()+6)%7; // 0=Mon
+    const dowSel=new Set([selDow]);
+
+    // ── Specific dates selection (alternative mode) ─────────────────────
+    let useSpecific=false;
+    const specificDates=new Set();
+
+    const tplWrap=h("div",{});
+    const dowWrap=h("div",{sty:{display:"flex",gap:6,flexWrap:"wrap",margin:"8px 0 4px"}});
+    const calWrap2=h("div",{sty:{marginBottom:12}});
+    const previewEl=h("div",{sty:{fontSize:13,color:"var(--mu)",margin:"8px 0"}});
+    const monthLbl2=h("span",{sty:{fontWeight:600,fontSize:14,flex:1,textAlign:"center"}});
+
+    function buildTplBlocks(){
+      tplWrap.innerHTML="";
+      tplBlocks.forEach((blk,idx)=>{
+        const fI=h("input",{cls:"fi",type:"time",value:blk.fromTime});
+        const tI=h("input",{cls:"fi",type:"time",value:blk.toTime});
+        const cS=h("select",{cls:"fi"});
+        cS.appendChild(h("option",{value:""},"— Клиника —"));
+        CLINICS.forEach(c=>{const o=h("option",{value:c},c);if(c===blk.clinic)o.selected=true;cS.appendChild(o);});
+        const cC=h("input",{cls:"fi",placeholder:"Или введите...",value:CLINICS.includes(blk.clinic)?"":blk.clinic||""});
+        const dI=h("input",{cls:"fi",type:"number",value:blk.slotDuration||30});
+        fI.oninput=e=>{tplBlocks[idx].fromTime=e.target.value;updatePreview();};
+        tI.oninput=e=>{tplBlocks[idx].toTime=e.target.value;updatePreview();};
+        cS.onchange=e=>{tplBlocks[idx].clinic=e.target.value||cC.value;};
+        cC.oninput=e=>{tplBlocks[idx].clinic=e.target.value;};
+        dI.oninput=e=>{tplBlocks[idx].slotDuration=parseInt(e.target.value)||30;updatePreview();};
+        const card=h("div",{cls:"block-card",sty:{gap:8,flexDirection:"column",alignItems:"stretch"}},
+          h("div",{sty:{display:"flex",alignItems:"center",justifyContent:"space-between"}},
+            h("span",{sty:{fontWeight:700,fontSize:13}},"Блок "+(idx+1)),
+            h("button",{cls:"btn br bsm",onclick:()=>{tplBlocks.splice(idx,1);buildTplBlocks();updatePreview();}},"✕")
+          ),
+          h("div",{sty:{display:"grid",gridTemplateColumns:"1fr 1fr 1fr",gap:6}},
+            h("div",{},h("label",{cls:"fl"},"С"),fI),
+            h("div",{},h("label",{cls:"fl"},"По"),tI),
+            h("div",{},h("label",{cls:"fl"},"Мин/слот"),dI)
+          ),
+          h("div",{},h("label",{cls:"fl"},"Клиника"),cS,cC)
+        );
+        tplWrap.appendChild(card);
+      });
+      const addB=h("button",{cls:"btn bs bsm",sty:{marginTop:4},onclick:()=>{
+        tplBlocks.push({id:uid(),fromTime:"14:00",toTime:"18:00",clinic:CLINICS[0],slotDuration:30});
+        buildTplBlocks();updatePreview();
+      }},"+  Добавить блок");
+      tplWrap.appendChild(addB);
     }
-    srcI.oninput=fromI.oninput=toI.oninput=updatePreview;
-    updatePreview();
+
+    function buildDowRow(){
+      dowWrap.innerHTML="";
+      DOW_RU.forEach((d,i)=>{
+        const on=dowSel.has(i);
+        const btn=h("button",{cls:"btn bsm "+(on?"bp":"bs"),sty:{minWidth:42}},d);
+        btn.onclick=()=>{
+          if(dowSel.has(i))dowSel.delete(i);else dowSel.add(i);
+          buildDowRow();buildCalendar2();updatePreview();
+        };
+        dowWrap.appendChild(btn);
+      });
+    }
+
+    function buildCalendar2(){
+      calWrap2.innerHTML="";
+      const yr=tgtYear,mo=tgtMonth;
+      monthLbl2.textContent=new Date(yr,mo).toLocaleDateString("ru-RU",{month:"long",year:"numeric"});
+      const grid=h("div",{sty:{display:"grid",gridTemplateColumns:"repeat(7,1fr)",gap:3}});
+      // DOW headers
+      const hdr=h("div",{sty:{display:"grid",gridTemplateColumns:"repeat(7,1fr)",gap:3,marginBottom:4}});
+      DOW_RU.forEach(d=>hdr.appendChild(h("div",{sty:{textAlign:"center",fontSize:10,fontWeight:700,color:"var(--mu)",padding:"2px 0"}},d)));
+      calWrap2.appendChild(hdr);
+      const firstDow=new Date(yr,mo,1).getDay();
+      const offset=firstDow===0?6:firstDow-1;
+      for(let i=0;i<offset;i++)grid.appendChild(h("div",{}));
+      const daysInMonth=new Date(yr,mo+1,0).getDate();
+      for(let day=1;day<=daysInMonth;day++){
+        const d=new Date(yr,mo,day,12,0,0);
+        const dow=(d.getDay()+6)%7; // 0=Mon
+        const ds=localDateStr(d);
+        const isSrc=ds===SCR.schDate;
+        const isAutoSel=!useSpecific&&dowSel.has(dow);
+        const isManuSel=useSpecific&&specificDates.has(ds);
+        const isSel=isAutoSel||isManuSel;
+        const isBooked=(S.schedule[ds]?.slots||[]).some(s=>!s.available&&s.patientId);
+        const cell=h("div",{sty:{
+          padding:"6px 2px",borderRadius:8,textAlign:"center",cursor:"pointer",
+          background:isSrc?"var(--a)":isSel?"var(--p)":"",
+          border:isBooked&&!isSel?"1.5px dashed #FCA5A5":"1.5px solid transparent",
+          opacity:1
+        }},
+          h("div",{sty:{fontSize:13,fontWeight:700,color:isSrc||isSel?"#fff":"var(--tx)"}},day)
+        );
+        if(useSpecific){
+          cell.onclick=()=>{if(specificDates.has(ds))specificDates.delete(ds);else specificDates.add(ds);buildCalendar2();updatePreview();};
+        }
+        grid.appendChild(cell);
+      }
+      calWrap2.appendChild(grid);
+      if(useSpecific&&specificDates.size>0){
+        calWrap2.appendChild(h("div",{sty:{fontSize:12,color:"var(--mu)",marginTop:6}},
+          "Выбрано дат: "+specificDates.size));
+      }
+    }
+
+    function getTargetDates(){
+      const yr=tgtYear,mo=tgtMonth;
+      const daysInMonth=new Date(yr,mo+1,0).getDate();
+      const dates=[];
+      for(let day=1;day<=daysInMonth;day++){
+        const d=new Date(yr,mo,day,12,0,0);
+        const ds=localDateStr(d);
+        const dow=(d.getDay()+6)%7;
+        if(useSpecific?specificDates.has(ds):dowSel.has(dow)) dates.push(ds);
+      }
+      return dates;
+    }
+
+    function updatePreview(){
+      const dates=getTargetDates();
+      const slots=tplBlocks.reduce((sum,b)=>{
+        const from=b.fromTime.split(":").reduce((a,v,i)=>i?a+parseInt(v):parseInt(v)*60,0);
+        const to=b.toTime.split(":").reduce((a,v,i)=>i?a+parseInt(v):parseInt(v)*60,0);
+        return sum+Math.floor((to-from)/(b.slotDuration||30));
+      },0);
+      previewEl.textContent=dates.length
+        ?"Будет создано: "+dates.length+" дней × "+tplBlocks.length+" блок(а) × ~"+slots+" слотов"
+        :"Выберите хотя бы один день";
+    }
+
+    // ── Mode toggle ──────────────────────────────────────────────────────
+    const modeBtn=h("button",{cls:"btn bs bsm",onclick:()=>{
+      useSpecific=!useSpecific;
+      modeBtn.textContent=useSpecific?"← По дням недели":"Выбрать конкретные даты →";
+      buildDowRow();buildCalendar2();updatePreview();
+    }},"Выбрать конкретные даты →");
+
+    buildTplBlocks();buildDowRow();buildCalendar2();updatePreview();
+
     const body=h("div",{cls:"modal"},
+      // Header
       h("div",{sty:{display:"flex",alignItems:"center",justifyContent:"space-between",marginBottom:16}},
-        h("div",{sty:{fontWeight:800,fontSize:18}},"Копировать расписание"),
+        h("div",{sty:{fontWeight:800,fontSize:18}},"Типовое расписание"),
         h("button",{cls:"hb",sty:{background:"var(--bg)",color:"var(--tx)"},onclick:close},"✕")
       ),
-      h("div",{cls:"alert alert-warn",sty:{marginBottom:16}},"Копирует блоки работы по дням недели. Понедельник → все понедельники периода, вторник → все вторники и т.д. Уже записанные пациенты не затрагиваются."),
-      h("div",{cls:"fg"},h("label",{cls:"fl"},"Образец (любой день исходной недели)"),srcI),
-      h("div",{sty:{display:"grid",gridTemplateColumns:"1fr 1fr",gap:8}},
-        h("div",{cls:"fg"},h("label",{cls:"fl"},"Целевой период: с"),fromI),
-        h("div",{cls:"fg"},h("label",{cls:"fl"},"по"),toI)
+      // Step 1: Template blocks
+      h("div",{cls:"st"},"1. Блоки работы"),
+      tplWrap,
+      // Step 2: Target month
+      h("div",{cls:"st",sty:{marginTop:12}},"2. Месяц"),
+      h("div",{sty:{display:"flex",alignItems:"center",gap:8,marginBottom:10}},
+        h("button",{cls:"btn bs bsm",onclick:()=>{tgtMonth--;if(tgtMonth<0){tgtMonth=11;tgtYear--;}buildCalendar2();updatePreview();}},  "←"),
+        monthLbl2,
+        h("button",{cls:"btn bs bsm",onclick:()=>{tgtMonth++;if(tgtMonth>11){tgtMonth=0;tgtYear++;}buildCalendar2();updatePreview();}},  "→")
       ),
+      // Step 3: Days selection
+      h("div",{cls:"st"},"3. Дни"),
+      modeBtn,
+      dowWrap,
+      calWrap2,
+      h("div",{cls:"alert alert-warn",sty:{marginBottom:8,fontSize:12}},"⚠️ Красная пунктирная рамка = есть записанные пациенты. Их записи не удаляются, но свободные слоты будут пересозданы."),
       previewEl,
-      h("button",{cls:"btn bp bw",sty:{marginTop:12},onclick:async()=>{
-        if(!srcI.value||!fromI.value||!toI.value||fromI.value>toI.value)return;
-        const count=copyScheduleByWeek(srcI.value,fromI.value,toI.value);
+      // Apply button
+      h("button",{cls:"btn bp bw",sty:{marginTop:8},onclick:async()=>{
+        const dates=getTargetDates();
+        if(!dates.length){alert("Выберите хотя бы один день");return;}
+        const ns={...S.schedule};
+        dates.forEach(ds=>{
+          const curDay=ns[ds]||{blocks:[],slots:[]};
+          const bookedSlots=(curDay.slots||[]).filter(s=>!s.available&&s.patientId);
+          const newBlocks=tplBlocks.map(b=>({...b,id:uid()}));
+          let newSlots=[];
+          newBlocks.forEach(b=>newSlots=[...newSlots,...generateSlots(b)]);
+          // Merge: keep booked, add new free slots
+          const times=new Set(bookedSlots.map(s=>s.time));
+          const toAdd=newSlots.filter(s=>!times.has(s.time));
+          const merged=[...bookedSlots,...toAdd].sort((a,b2)=>a.time.localeCompare(b2.time));
+          ns[ds]={blocks:newBlocks,slots:merged};
+        });
+        S.schedule=ns;triggerSave(["schedule"]);
         close();rebAll();
-        const msg=h("div",{cls:"alert alert-ok",sty:{marginTop:8}},"✓ Скопировано на "+count+" дней");
+        const msg=h("div",{cls:"alert alert-ok",sty:{marginTop:8}},"✓ Расписание создано на "+dates.length+" дней");
         slWrap.insertBefore(msg,slWrap.firstChild);
-        setTimeout(()=>msg.remove(),3000);
-      }},"Скопировать")
+        setTimeout(()=>msg.remove(),4000);
+      }},"✓ Применить расписание")
     );
     overlay=h("div",{cls:"overlay",onclick:e=>{if(e.target===overlay)close();}},body);
     document.getElementById("app").appendChild(overlay);
@@ -1288,44 +1470,60 @@ async function savePats(arr,noRender){
 // ===================== DOCTOR / ADMIN =====================
 function renderDoctor(){
   const td=today();
-  // Live data computed in rebMain to stay fresh
   const wrap=h("div",{cls:"desktop"});
   const sb=h("div",{cls:"sb"});
-  sb.appendChild(h("div",{sty:{marginBottom:20,paddingLeft:4}},
+  const isAdmin=S.session?.role==="admin";
+  const navItems=[{k:"dashboard",i:"📊",l:"Дашборд"},{k:"patients",i:"👥",l:"Пациенты"},{k:"schedule",i:"📅",l:"Расписание"}];
+  if(isAdmin)navItems.push({k:"admin",i:"⚙️",l:"Администратор"});
+
+  // Brand (desktop only via CSS)
+  sb.appendChild(h("div",{cls:"sb-brand"},
     h("div",{sty:{fontSize:14,fontWeight:800,color:"var(--p)"}},"🩺 Доктор Войнов"),
     h("div",{sty:{fontSize:11,color:"var(--mu)",marginTop:2}},S.session?.name||""),
     h("div",{sty:{fontSize:10,color:"#059669",marginTop:2}},"✓ Google Sheets")
   ));
-  const isAdmin=S.session?.role==="admin";
-  const navItems=[{k:"dashboard",i:"📊",l:"Дашборд"},{k:"patients",i:"👥",l:"Пациенты"},{k:"schedule",i:"📅",l:"Расписание"}];
-  if(isAdmin)navItems.push({k:"admin",i:"⚙️",l:"Администратор"});
+
+  // Main nav items
   navItems.forEach(n=>{
-    sb.appendChild(h("button",{cls:"si"+(SCR.dview===n.k&&!SCR.editId?" on":""),onclick:()=>{SCR.dview=n.k;SCR.editId=null;rebMain();}},h("span",{},n.i),n.l));
+    sb.appendChild(h("button",{cls:"si"+(SCR.dview===n.k&&!SCR.editId?" on":""),"data-nav":n.k,onclick:()=>{SCR.dview=n.k;SCR.editId=null;rebMain();}},
+      h("span",{sty:{fontSize:18}},n.i),h("span",{cls:"si-lbl"},n.l)));
   });
-  sb.appendChild(h("div",{sty:{flex:1}}));
-  // Role preview switcher (admin only)
+
+  // Footer: sync, password, logout, preview
+  const footer=h("div",{cls:"sb-footer"});
   if(isAdmin){
-    const prvSec=h("div",{sty:{borderTop:"1px solid var(--bd)",paddingTop:8,marginBottom:4}});
-    prvSec.appendChild(h("div",{sty:{fontSize:10,color:"var(--hi)",fontWeight:700,letterSpacing:".5px",textTransform:"uppercase",padding:"0 11px 4px"}},"Просмотр как"));
+    const prvBtn=h("button",{cls:"si",title:"Просмотр как..."},h("span",{sty:{fontSize:18}},"👁"),h("span",{cls:"si-lbl"},"Просмотр как"));
+    const prvMenu=h("div",{sty:{display:"none",background:"#fff",border:"1px solid var(--bd)",borderRadius:10,padding:6,position:"absolute",zIndex:200,boxShadow:"0 4px 16px rgba(0,0,0,.1)",minWidth:160}});
     [{r:"doctor",i:"👨‍⚕️",l:"Врач"},{r:"assistant",i:"📱",l:"Ассистент"},{r:"web",i:"🌐",l:"Команда сайта"}].forEach(({r,i,l})=>{
-      prvSec.appendChild(h("button",{cls:"si",onclick:()=>{S._previewFrom=S.session.role;S.session={...S.session,role:r};SCR.tab="today";SCR.sub=null;render();}},h("span",{},i),l));
+      prvMenu.appendChild(h("button",{cls:"si",onclick:()=>{prvMenu.style.display="none";S._previewFrom=S.session.role;S.session={...S.session,role:r};SCR.tab="today";SCR.sub=null;render();}},h("span",{},i)," "+l));
     });
-    sb.appendChild(prvSec);
+    prvBtn.onclick=e=>{e.stopPropagation();prvMenu.style.display=prvMenu.style.display==="none"?"block":"none";};
+    document.addEventListener("click",()=>{prvMenu.style.display="none";},{once:false});
+    const prvWrap=h("div",{sty:{position:"relative"}},prvBtn,prvMenu);
+    footer.appendChild(prvWrap);
   }
-  sb.appendChild(mkSyncBar());
-  sb.appendChild(h("button",{cls:"si",onclick:()=>{
+  footer.appendChild(mkSyncBar(true));
+  footer.appendChild(h("button",{cls:"si",title:"Сменить пароль",onclick:()=>{
     const u=S.users.find(x=>x.id===S.session?.userId);
     if(u){SCR.dview="changepw";SCR.editId=null;rebMain();}
-  }},"🔑 Сменить пароль"));
-  sb.appendChild(h("button",{cls:"si",sty:{color:"var(--r)"},onclick:()=>{S.session=null;saveCfg();render();}},"🚪 Выход"));
+  }},h("span",{sty:{fontSize:18}},"🔑"),h("span",{cls:"si-lbl"},"Сменить пароль")));
+  footer.appendChild(h("button",{cls:"si",title:"Выход",sty:{color:"var(--r)"},onclick:()=>{S.session=null;saveCfg();render();}},
+    h("span",{sty:{fontSize:18}},"🚪"),h("span",{cls:"si-lbl"},"Выход")));
+  sb.appendChild(footer);
   const main=h("div",{cls:"dmain"});
   function rebMain(){
     // Recompute live data on each navigation
-    const todaySl=(S.schedule[td]?.slots||[]).filter(s=>!s.available&&s.patientId);
+    const todaySl=(S.schedule[td]?.slots||[]).filter(s=>!s.available&&s.patientId).map(s=>{
+      const pat=S.patients.find(x=>x.id===s.patientId);
+      return {...s,_patStatus:pat?.status};
+    }).filter(s=>!["consulted","operated","followup","completed","cancelled"].includes(s._patStatus));
     const needC=S.patients.filter(p=>p.nextContact&&p.nextContact<=td);
     const todayPatIds=new Set((S.schedule[td]?.slots||[]).filter(s=>!s.available&&s.patientId).map(s=>s.patientId));
     const upOps=S.patients.filter(p=>p.opDate&&p.opDate>=td&&!todayPatIds.has(p.id)).sort((a,b)=>a.opDate.localeCompare(b.opDate));
-    sb.querySelectorAll(".si").forEach((b,i)=>{if(i<navItems.length)b.className="si"+(navItems[i].k===SCR.dview&&!SCR.editId?" on":"");});
+    // Update nav active state by data attribute
+    sb.querySelectorAll(".si[data-nav]").forEach(b=>{
+      b.className="si"+(b.dataset.nav===SCR.dview&&!SCR.editId?" on":"");
+    });
     main.innerHTML="";
     if(SCR.editId){const p=S.patients.find(x=>x.id===SCR.editId);main.appendChild(renderPatDetail(p,S.session.role,()=>{SCR.editId=null;rebMain();}));}
     else if(SCR.dview==="dashboard")main.appendChild(docDash(todaySl,needC,upOps,td,rebMain));
