@@ -312,7 +312,7 @@ function renderLogin(){
     if(!user.passwordHash){err.style.display="block";err.textContent="Пароль ещё не установлен. Обратитесь к администратору.";btn.disabled=false;btn.textContent="Войти";return;}
     const hash=await hashPw(pw);
     if(hash!==user.passwordHash){err.style.display="block";err.textContent="Неверный пароль";btn.disabled=false;btn.textContent="Войти";return;}
-    S.session={userId:user.id,email:user.email,name:user.name,role:user.role};saveCfg();render();
+    S.session={userId:user.id,email:user.email,name:user.name,role:user.role};S._previewFrom=null;saveCfg();render();
   }},"Войти");
   // First run — no users at all
   const isFirstRun=S.users.length===0;
@@ -381,7 +381,7 @@ function patCard(p,onClick){
     h("div",{cls:"av"},(p.name||"?")[0]),
     h("div",{sty:{flex:1}},
       h("div",{sty:{fontWeight:700,fontSize:14}},p.name),
-      h("div",{sty:{fontSize:12,color:"var(--mu)"}},"📞 "+p.phone+(p.birthDate?" · "+ageLabel(p.birthDate):"")),
+      h("div",{sty:{fontSize:12,color:"var(--mu)"}},"📋 "+p.phone+(p.birthDate?" · "+ageLabel(p.birthDate):"")),
       h("span",{cls:"tag",sty:{display:"inline-block",marginTop:3,background:(s?.c||"#ccc")+"22",color:s?.c||"#666"}},s?.l||p.status)
     ),h("span",{sty:{color:"var(--mu)",fontSize:20}},"›")
   );
@@ -414,7 +414,7 @@ function renderPatDetail(p,role,onBack){
       h("div",{cls:"av",sty:{width:50,height:50,fontSize:20}},(p.name||"?")[0]),
       h("div",{sty:{flex:1}},
         h("div",{sty:{fontSize:18,fontWeight:800}},p.name),
-        h("div",{sty:{fontSize:13,color:"var(--mu)"}},"📞 "+p.phone+(p.birthDate?" · "+ageLabel(p.birthDate):""))
+        h("div",{sty:{fontSize:13,color:"var(--mu)"}},"📋 "+p.phone+(p.birthDate?" · "+ageLabel(p.birthDate):""))
       )
     ),
     role!=="web"?h("button",{cls:"btn bp bw",sty:{marginBottom:12},onclick:()=>showBookingModal(p)},"📅 Записать на приём"):null,
@@ -429,6 +429,7 @@ function patInfo(p,role){
   statusSel.onchange=async e=>{await savePats(S.patients.map(pr=>pr.id!==p.id?pr:{...pr,status:e.target.value}),true);};
   const rows=[
     p.birthDate&&["Дата рождения",fmtD(p.birthDate)+(p.birthDate?" ("+ageLabel(p.birthDate)+")":"")],
+    p.phone&&["Контакты",p.phone],
     ["Источник",SRC[p.source]||p.source||"—"],
     ["Добавлен",fmtD(p.createdAt)],
     p.complaint&&["Жалоба",p.complaint],
@@ -590,7 +591,7 @@ function patEditForm(p,role,onSaved){
   return h("div",{},
     h("div",{cls:"fg"},h("label",{cls:"fl"},"Статус"),fi("status",{tag:"select"})),
     h("div",{cls:"fg"},h("label",{cls:"fl"},"Имя"),fi("name",{placeholder:"Имя пациента"})),
-    h("div",{cls:"fg"},h("label",{cls:"fl"},"Телефон"),fi("phone",{type:"tel"})),
+    h("div",{cls:"fg"},h("label",{cls:"fl"},"Контакты"),fi("phone",{placeholder:"Телефон, Telegram, email..."})),
     h("div",{cls:"fg"},h("label",{cls:"fl"},"Дата рождения"),bdI,ageD),
     h("div",{cls:"fg"},h("label",{cls:"fl"},"Источник"),srcSel),
     h("div",{cls:"fg"},h("label",{cls:"fl"},"Жалоба"),fi("complaint",{tag:"textarea"})),
@@ -753,7 +754,7 @@ function renderSchedule(role){
       const slots=S.schedule[ds]?.slots||[];
       const fr=slots.filter(s=>s.available).length;
       const tot=slots.length;
-      const inactive=isPast; // weekends are now allowed
+      const inactive=false; // all days are clickable (past days show historical data)
       const cell=h("div",{sty:{
         padding:"6px 2px",borderRadius:"8px",textAlign:"center",
         cursor:inactive?"default":"pointer",
@@ -879,13 +880,17 @@ function renderSchedule(role){
           // New patient mini-form
           if(showNewPat){
             const nN=h("input",{cls:"fi",placeholder:"Имя и фамилия *"});
-            const nP=h("input",{cls:"fi",type:"tel",placeholder:"Телефон *",sty:{marginTop:8}});
+            const nP=h("input",{cls:"fi",type:"text",placeholder:"Контакты (необязательно)",sty:{marginTop:8}});
             bookWrap.appendChild(h("div",{cls:"card",sty:{marginBottom:10}},
               h("div",{sty:{fontWeight:700,marginBottom:8}},"Новый пациент"),nN,nP,
               h("button",{cls:"btn bs bsm",sty:{marginTop:8},onclick:async()=>{
-                if(!nN.value.trim()||!nP.value.trim())return;
+                if(!nN.value.trim())return;
                 const np={id:uid(),name:nN.value.trim(),phone:nP.value.trim(),source:"other",birthDate:"",complaint:"",tasks:[],notes:[],createdAt:new Date().toISOString(),status:"new"};
-                await savePats([...S.patients,np],true);selPat=np;showNewPat=false;rebBook();
+                // Save immediately to API (not debounced) so patient exists before booking
+                S.patients=[...S.patients,np];
+                cacheSet("patients",S.patients);
+                apiPost("patients",S.patients);
+                selPat=np;showNewPat=false;rebBook();
               }},"Создать и выбрать")
             ));
           }
@@ -1045,6 +1050,7 @@ function renderAdminUsers(reb){
         }},u.active!==false?"Блок.":"Разбл."),
         h("button",{cls:"btn br bsm",onclick:async()=>{
           if(!confirm("Удалить пользователя "+u.name+"?"))return;
+          if(S.users.filter(x=>x.role==="admin"&&x.active!==false).length<=1&&u.role==="admin"){alert("Нельзя удалить последнего администратора.");return;}
           S.users=S.users.filter(x=>x.id!==u.id);triggerSave(["users"]);reb&&reb();
         }},"Удалить")
       ):null
@@ -1260,7 +1266,7 @@ function docDash(todaySl,needC,upOps,td,reb){
   if(needC.length){
     wrap.appendChild(h("div",{cls:"st",sty:{color:"#D97706"}},"⚠️ Требуют контакта"));
     needC.forEach(p=>wrap.appendChild(h("div",{cls:"card",sty:{borderLeft:"3px solid #D97706",cursor:"pointer",padding:"10px 14px"},onclick:()=>{SCR.openEdit=true;SCR.editId=p.id;reb();}},
-      h("div",{sty:{fontWeight:600}},p.name),h("div",{sty:{fontSize:12,color:"var(--mu)"}},"📞 "+p.phone+" · "+fmtD(p.nextContact))
+      h("div",{sty:{fontWeight:600}},p.name),h("div",{sty:{fontSize:12,color:"var(--mu)"}},"📋 "+p.phone+" · "+fmtD(p.nextContact))
     )));
   }
   if(upOps.length){
@@ -1287,13 +1293,13 @@ function docPats(td,reb){
   }
   function bld(q){
     inner.innerHTML="";
-    const fl=(q?S.patients.filter(p=>p.name.toLowerCase().includes(q.toLowerCase())||p.phone.includes(q)):[...S.patients]).sort((a,b)=>b.createdAt.localeCompare(a.createdAt));
+    const fl=(q?S.patients.filter(p=>p.name.toLowerCase().includes(q.toLowerCase())||(p.phone||"").includes(q)):[...S.patients]).sort((a,b)=>b.createdAt.localeCompare(a.createdAt));
     if(!fl.length){inner.appendChild(h("div",{cls:"emp"},h("div",{cls:"empi"},"👥"),h("div",{},"Нет пациентов")));return;}
     const tbl=h("table",{cls:"tbl"});
     tbl.appendChild(h("thead",{},h("tr",{},h("th",{},"Пациент"),h("th",{},"Статус"),h("th",{},"Операция"),h("th",{},"Цена"),h("th",{},"Контакт"))));
     const tb=h("tbody",{});
     fl.forEach(p=>{const s=ST[p.status];tb.appendChild(h("tr",{onclick:()=>{SCR.openEdit=true;SCR.editId=p.id;reb();}},
-      h("td",{},h("div",{sty:{fontWeight:600}},p.name),h("div",{sty:{fontSize:11,color:"#6B7280"}},p.phone+(p.birthDate?" · "+ageLabel(p.birthDate):""))),
+      h("td",{},h("div",{sty:{fontWeight:600}},p.name),h("div",{sty:{fontSize:11,color:"#6B7280"}},(p.phone||"")+(p.birthDate?" · "+ageLabel(p.birthDate):""))),
       h("td",{},h("span",{cls:"tag",sty:{background:(s?.c||"#ccc")+"22",color:s?.c}},s?.l)),
       h("td",{},p.opDate?fmtD(p.opDate):(p.opDateText||"—")),
       h("td",{},p.opPrice?Number(p.opPrice).toLocaleString("ru-RU")+" ₽":"—"),
@@ -1308,7 +1314,7 @@ function docPats(td,reb){
 function renderAddPatForm(role,onBack){
   const v={name:"",phone:"",source:"instagram",birthDate:"",complaint:""};
   const nI=h("input",{cls:"fi",placeholder:"Иван Иванов"});nI.oninput=e=>v.name=e.target.value;
-  const phI=h("input",{cls:"fi",type:"tel",placeholder:"+7..."});phI.oninput=e=>v.phone=e.target.value;
+  const phI=h("input",{cls:"fi",type:"text",placeholder:"Телефон, Telegram, email..."});phI.oninput=e=>v.phone=e.target.value;
   const bdI=h("input",{cls:"fi",type:"date"});
   const ageD=h("div",{sty:{fontSize:12,color:"var(--mu)",marginTop:4}});
   bdI.oninput=e=>{v.birthDate=e.target.value;ageD.textContent=v.birthDate?"Возраст: "+ageLabel(v.birthDate):"";};
@@ -1317,12 +1323,12 @@ function renderAddPatForm(role,onBack){
   return h("div",{},
     h("button",{cls:"bbk",onclick:onBack},"← Назад"),
     h("div",{cls:"fg"},h("label",{cls:"fl"},"Имя и фамилия *"),nI),
-    h("div",{cls:"fg"},h("label",{cls:"fl"},"Телефон *"),phI),
+    h("div",{cls:"fg"},h("label",{cls:"fl"},"Контакты"),phI),
     h("div",{cls:"fg"},h("label",{cls:"fl"},"Дата рождения"),bdI,ageD),
     h("div",{cls:"fg"},h("label",{cls:"fl"},"Источник"),sS),
     h("div",{cls:"fg"},h("label",{cls:"fl"},"Жалоба"),cI),
     h("button",{cls:"btn bp bw",onclick:async()=>{
-      if(!v.name.trim()||!v.phone.trim())return;
+      if(!v.name.trim())return;
       const p={id:uid(),name:nI.value.trim(),phone:phI.value.trim(),source:sS.value,birthDate:bdI.value,complaint:cI.value,tasks:[],notes:[],createdAt:new Date().toISOString(),status:"new"};
       await savePats([...S.patients,p],true);onBack();
     }},"Добавить пациента")
@@ -1405,7 +1411,7 @@ function taskRowSimple(t,urg,fut){
   const hdr=h("div",{cls:"task-hdr",onclick:()=>{SCR.openTaskId=t.id;SCR.sub="pat";SCR.editId=t.pId;render();}},
     h("div",{sty:{flex:1}},
       h("div",{sty:{fontWeight:700,fontSize:14}},t.pName),
-      h("div",{sty:{fontSize:12,color:"var(--mu)"}},"📞 "+t.pPhone),
+      t.pPhone?h("div",{sty:{fontSize:12,color:"var(--mu)"}},t.pPhone):null,
       h("span",{cls:"tag",sty:{background:"var(--pll)",color:"var(--p)"}},CT[t.type]||t.type),
       t.dueDate!==today()&&h("div",{sty:{fontSize:11,color:fut?"var(--mu)":"var(--r)",marginTop:3}},"📅 "+fmtD(t.dueDate))
     ),chk
@@ -1421,7 +1427,7 @@ function renderPatsTab(){
   const lst=h("div",{});
   function draw(q){
     lst.innerHTML="";
-    const fl=(q?S.patients.filter(p=>p.name.toLowerCase().includes(q.toLowerCase())||p.phone.includes(q)):[...S.patients]).sort((a,b)=>b.createdAt.localeCompare(a.createdAt));
+    const fl=(q?S.patients.filter(p=>p.name.toLowerCase().includes(q.toLowerCase())||(p.phone||"").includes(q)):[...S.patients]).sort((a,b)=>b.createdAt.localeCompare(a.createdAt));
     if(!fl.length){lst.appendChild(h("div",{cls:"emp"},h("div",{cls:"empi"},"👤"),h("div",{},"Нет пациентов")));return;}
     fl.forEach(p=>lst.appendChild(patCard(p,()=>{SCR.sub="pat";SCR.editId=p.id;render();})));
   }
