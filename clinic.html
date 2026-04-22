@@ -136,8 +136,8 @@ function triggerSave(keys){
   if(keys.includes("users"))cacheSet("users",S.users);
   if(keys.includes("services"))cacheSet("services",S.services);
   // Users and services: save immediately (no debounce) to avoid race on reload
-  if(keys.includes("users"))apiPost("users",S.users);
-  if(keys.includes("services"))apiPost("services",S.services);
+  if(keys.includes("users")){apiPost("users",S.users);setTimeout(()=>{_pendingKeys.delete("users");},5000);}
+  if(keys.includes("services")){apiPost("services",S.services);setTimeout(()=>{_pendingKeys.delete("services");},5000);}
   // Patients and schedule: debounced
   clearTimeout(saveTimer);
   saveTimer=setTimeout(()=>{
@@ -179,17 +179,18 @@ function migrateSchedule(sch){
 
 // ===================== UTILS =====================
 const uid=()=>Date.now().toString(36)+Math.random().toString(36).slice(2,6);
-const today=()=>new Date().toISOString().split("T")[0];
+const today=()=>{const d=new Date();return d.getFullYear()+"-"+(String(d.getMonth()+1).padStart(2,"0"))+"-"+(String(d.getDate()).padStart(2,"0"));};
 const parseDate=s=>{if(!s)return null;const d=new Date(/^\d{4}-\d{2}-\d{2}$/.test(s)?s+"T12:00:00":s);return isNaN(d.getTime())?null:d;};
 const fmtD=s=>{const d=parseDate(s);return d?d.toLocaleDateString("ru-RU",{day:"numeric",month:"short"}):"—";};
 const fmtF=s=>{const d=parseDate(s);return d?d.toLocaleDateString("ru-RU",{day:"numeric",month:"long",year:"numeric"}):"—";};
 function calcAge(bd){if(!bd)return null;const b=new Date(bd),n=new Date();let a=n.getFullYear()-b.getFullYear();if(n.getMonth()<b.getMonth()||(n.getMonth()===b.getMonth()&&n.getDate()<b.getDate()))a--;return a>=0?a:null;}
 function ageLabel(bd){const a=calcAge(bd);if(a===null)return"—";const s=a%10===1&&a%100!==11?"год":a%10>=2&&a%10<=4&&(a%100<10||a%100>=20)?"года":"лет";return a+" "+s;}
 
-const ST={new:{l:"Новый",c:"#64748B"},scheduled:{l:"Записан",c:"#2563EB"},consulted:{l:"Принят",c:"#7C3AED"},preop:{l:"Ждёт операции",c:"#D97706"},operated:{l:"Прооперирован",c:"#059669"},followup:{l:"Наблюдение",c:"#0891B2"},completed:{l:"Завершён",c:"#94A3B8"}};
+const ST={new:{l:"Новый",c:"#64748B"},scheduled:{l:"Записан",c:"#2563EB"},consulted:{l:"Принят",c:"#7C3AED"},preop:{l:"Ждёт операции",c:"#D97706"},operated:{l:"Прооперирован",c:"#059669"},followup:{l:"Наблюдение",c:"#0891B2"},cancelled:{l:"Отменён",c:"#EF4444"},completed:{l:"Завершён",c:"#94A3B8"}};
 const CT={callback:"Перезвонить",confirm:"Подтвердить запись",postop:"После операции",postvisit:"После приёма",schedule:"Записать на приём",review:"Попросить отзыв"};
 const SRC={instagram:"Instagram",telegram:"Telegram",site:"Сайт",yandex:"Яндекс",referral:"Направление",repeat:"Повторный",other:"Другое"};
 const CLINICS=["Реал Клиник","Н-клиник","Акфа Ташкент"];
+function fmtPrice(price,clinic){if(!price)return"—";const n=Number(price).toLocaleString("ru-RU");return(clinic||"").includes("Акфа")||((clinic||"").includes("Ташкент"))?n+" сум":n+" ₽";}
 const ROLES={admin:"Администратор",doctor:"Врач",assistant:"Ассистент",web:"Команда сайта"};
 
 function autoStatus(p){
@@ -435,7 +436,7 @@ function patInfo(p,role){
     p.complaint&&["Жалоба",p.complaint],
     p.outcome&&["Итог приёма",p.outcome],
     (p.opDate||p.opDateText)&&["Операция",p.opDate?fmtD(p.opDate):p.opDateText],
-    p.opPrice&&["Стоимость",Number(p.opPrice).toLocaleString("ru-RU")+" ₽"],
+    p.opPrice&&["Стоимость",fmtPrice(p.opPrice,(S.schedule[p.opDate]?.slots||[]).find(s=>s.patientId===p.id)?.clinic||"")],
     (p.nextAppointment||p.nextAppointmentText)&&["Следующий приём",p.nextAppointment?fmtD(p.nextAppointment):p.nextAppointmentText],
     p.nextContact&&["Контакт ассистента",fmtD(p.nextContact)],
     p.doctorNote&&["Заметка врача",p.doctorNote],
@@ -566,7 +567,29 @@ function patEditForm(p,role,onSaved){
   const bdI=h("input",{cls:"fi",type:"date",value:f.birthDate||""});
   bdI.oninput=e=>{f.birthDate=e.target.value;ageD.textContent=f.birthDate?"Возраст: "+ageLabel(f.birthDate):"";};
   const saveBtn=h("div",{sty:{display:"flex",gap:8}},
-    h("button",{cls:"btn bp",sty:{flex:1},onclick:async()=>{f.status=autoStatus(f);await savePats(S.patients.map(pr=>pr.id===f.id?f:pr),true);onSaved&&onSaved();}},"Сохранить"),
+    h("button",{cls:"btn bp",sty:{flex:1},onclick:async()=>{
+      f.status=autoStatus(f);
+      const prev=S.patients.find(pr=>pr.id===f.id)||{};
+      // Auto-create tasks for assistant based on what doctor filled
+      const newTasks=[...(f.tasks||[])];
+      const hasTaskOnDate=(type,date)=>newTasks.some(t=>!t.completed&&t.type===type&&t.dueDate===date);
+      if(f.nextContact&&f.nextContact!==prev.nextContact&&!hasTaskOnDate("callback",f.nextContact)){
+        newTasks.push({id:uid(),type:"callback",dueDate:f.nextContact,description:"Назначено врачом",completed:false,createdAt:new Date().toISOString()});
+      }
+      if(f.opDate&&f.opDate!==prev.opDate&&!hasTaskOnDate("confirm",f.opDate)){
+        const d=new Date(f.opDate+"T12:00:00");d.setDate(d.getDate()-1);
+        const confirmDate=d.toISOString().split("T")[0];
+        newTasks.push({id:uid(),type:"confirm",dueDate:confirmDate,description:"Подтвердить операцию "+fmtD(f.opDate),completed:false,createdAt:new Date().toISOString()});
+      }
+      if((f.outcome||f.doctorNote)&&(!prev.outcome&&!prev.doctorNote)){
+        if(!hasTaskOnDate("postvisit",today())){
+          newTasks.push({id:uid(),type:"postvisit",dueDate:today(),description:"Звонок после приёма",completed:false,createdAt:new Date().toISOString()});
+        }
+      }
+      f.tasks=newTasks;
+      await savePats(S.patients.map(pr=>pr.id===f.id?f:pr),true);
+      onSaved&&onSaved();
+    }},"Сохранить"),
     h("button",{cls:"btn bs",onclick:()=>onSaved&&onSaved()},"Отмена")
   );
   // Doctor sees simplified clinical form only
@@ -607,92 +630,156 @@ function patEditForm(p,role,onSaved){
 
 // ===================== BOOKING MODAL =====================
 function showBookingModal(p){
-  const wd=wDates(14);
-  let selDate=wd[0],selSlot=null,selSvc=null,customDur=null,showNewSvcFlag=false;
+  // Stable state — never reset by sub-form changes
+  let selDate=wDates(14)[0]||today(),selSlot=null,selSvc=null,customDur=null;
+  let showNewSvc=false;
   let overlay;
-  function close(){if(overlay&&overlay.parentNode)overlay.parentNode.removeChild(overlay);}
-  function build(){
-    if(overlay&&overlay.parentNode)overlay.parentNode.removeChild(overlay);
+  function close(){if(overlay?.parentNode)overlay.parentNode.removeChild(overlay);}
+
+  // Build once, then update parts in-place
+  const body=h("div",{cls:"modal"});
+  body.appendChild(h("div",{sty:{display:"flex",alignItems:"center",justifyContent:"space-between",marginBottom:16}},
+    h("div",{sty:{fontWeight:800,fontSize:18}},"Записать на приём"),
+    h("button",{cls:"hb",sty:{background:"var(--bg)",color:"var(--tx)"},onclick:close},"✕")
+  ));
+  body.appendChild(h("div",{sty:{fontWeight:600,marginBottom:12}},p.name));
+
+  // ─── Date strip (rebuilt when month changes) ──────────────────────────────
+  let schYr=(()=>{const d=new Date();return d.getFullYear();})();
+  let schMo=(()=>{const d=new Date();return d.getMonth();})();
+  const dateLabel=h("span",{sty:{fontWeight:600,fontSize:13,flex:1,textAlign:"center"}});
+  const dateStrip=h("div",{cls:"dr",sty:{marginBottom:0}});
+  const dateWrap=h("div",{cls:"fg"},h("label",{cls:"fl"},"Дата"),
+    h("div",{sty:{display:"flex",alignItems:"center",gap:6,marginBottom:6}},
+      h("button",{cls:"btn bs bsm",onclick:()=>{schMo--;if(schMo<0){schMo=11;schYr--;}rebDates();}},"←"),
+      dateLabel,
+      h("button",{cls:"btn bs bsm",onclick:()=>{schMo++;if(schMo>11){schMo=0;schYr++;}rebDates();}},"→")
+    ),
+    dateStrip
+  );
+  body.appendChild(dateWrap);
+
+  function rebDates(){
+    dateLabel.textContent=new Date(schYr,schMo).toLocaleDateString("ru-RU",{month:"long",year:"numeric"});
+    dateStrip.innerHTML="";
+    const allDays=[];const d=new Date(schYr,schMo,1);
+    while(d.getMonth()===schMo){allDays.push(d.toISOString().split("T")[0]);d.setDate(d.getDate()+1);}
+    allDays.forEach(dd=>{
+      const dobj=new Date(dd);
+      const fr=(S.schedule[dd]?.slots||[]).filter(s=>s.available).length;
+      const btn=h("button",{cls:"dc"+(dd===selDate?" on":""),onclick:()=>{selDate=dd;selSlot=null;rebSlots();rebBook();}},
+        h("span",{cls:"dsb"},dobj.toLocaleDateString("ru-RU",{weekday:"short"})),dobj.getDate(),
+        h("span",{cls:"dsb",sty:{color:dd===selDate?"rgba(255,255,255,.75)":"var(--p)"}},fr>0?fr+" св.":"—")
+      );
+      dateStrip.appendChild(btn);
+    });
+    // scroll selected into view
+    setTimeout(()=>{const sel=dateStrip.querySelector(".dc.on");if(sel)sel.scrollIntoView({inline:"center",block:"nearest"});},50);
+  }
+
+  // ─── Slot grid (rebuilt when date changes) ────────────────────────────────
+  const slotArea=h("div",{cls:"fg"},h("label",{cls:"fl"},"Время"));
+  body.appendChild(slotArea);
+  function rebSlots(){
+    // update date strip active state
+    dateStrip.querySelectorAll(".dc").forEach(b=>{
+      const dd=b.onclick?.toString(); // can't read easily, use textContent trick
+    });
+    dateStrip.innerHTML="";
+    const allDays2=[];const d2=new Date(schYr,schMo,1);
+    while(d2.getMonth()===schMo){allDays2.push(d2.toISOString().split("T")[0]);d2.setDate(d2.getDate()+1);}
+    allDays2.forEach(dd=>{
+      const dobj=new Date(dd);
+      const fr=(S.schedule[dd]?.slots||[]).filter(s=>s.available).length;
+      const btn=h("button",{cls:"dc"+(dd===selDate?" on":""),onclick:()=>{selDate=dd;selSlot=null;rebSlots();rebBook();}},
+        h("span",{cls:"dsb"},dobj.toLocaleDateString("ru-RU",{weekday:"short"})),dobj.getDate(),
+        h("span",{cls:"dsb",sty:{color:dd===selDate?"rgba(255,255,255,.75)":"var(--p)"}},fr>0?fr+" св.":"—")
+      );
+      dateStrip.appendChild(btn);
+    });
     const nowHHMM=(()=>{const n=new Date();return String(n.getHours()).padStart(2,"0")+":"+String(n.getMinutes()).padStart(2,"0");})();
-    const slots=(S.schedule[selDate]?.slots||[]).filter(s=>s.available&&(selDate!==today()||s.time>nowHHMM));
-    const body=h("div",{cls:"modal"});
-    body.appendChild(h("div",{sty:{display:"flex",alignItems:"center",justifyContent:"space-between",marginBottom:16}},
-      h("div",{sty:{fontWeight:800,fontSize:18}},"Записать на приём"),
-      h("button",{cls:"hb",sty:{background:"var(--bg)",color:"var(--tx)"},onclick:close},"✕")
-    ));
-    body.appendChild(h("div",{sty:{fontWeight:600,marginBottom:12}},p.name));
-    // Date
-    body.appendChild(h("div",{cls:"fg"},h("label",{cls:"fl"},"Дата"),
-      h("div",{cls:"dr",sty:{marginBottom:0}}, ...wd.map(d=>{
-        const dd=new Date(d);const fr=(S.schedule[d]?.slots||[]).filter(s=>s.available).length;
-        const b=h("button",{cls:"dc"+(d===selDate?" on":""),onclick:()=>{selDate=d;selSlot=null;build();}},
-          h("span",{cls:"dsb"},dd.toLocaleDateString("ru-RU",{weekday:"short"})),dd.getDate(),
-          h("span",{cls:"dsb",sty:{color:d===selDate?"rgba(255,255,255,.75)":"var(--p)"}},fr+" св."));
-        return b;
-      }))
-    ));
-    // Slots
-    body.appendChild(h("div",{cls:"fg"},h("label",{cls:"fl"},"Время"),
-      slots.length?h("div",{sty:{display:"flex",flexWrap:"wrap"}}, ...slots.map(s=>{
-        const el=h("div",{cls:"slt fr"+(selSlot?.time===s.time?" ":" "),sty:{background:selSlot?.time===s.time?"var(--p)":"",color:selSlot?.time===s.time?"#fff":""}},
-          s.time,s.clinic?h("div",{cls:"slt-name"},s.clinic):null);
-        if(selSlot?.time===s.time){el.style.background="var(--p)";el.style.color="#fff";}
-        el.onclick=()=>{selSlot=s;build();};
-        return el;
-      })):h("div",{sty:{fontSize:13,color:"var(--mu)",padding:"10px 0"}},"Нет свободных слотов на эту дату")
-    ));
-    // Service
-    body.appendChild(h("div",{cls:"fg"},h("label",{cls:"fl"},"Услуга"),
-      h("select",{cls:"fi",onchange:e=>{
-        if(e.target.value==="__new__"){selSvc=null;showNewSvcFlag=true;build();}
-        else{selSvc=S.services.find(s=>s.id===e.target.value)||null;customDur=selSvc?.duration||null;showNewSvcFlag=false;build();}
-      }},
-        h("option",{value:""},"— Выберите услугу —"),
-        ...S.services.map(sv=>{const o=h("option",{value:sv.id},sv.name+(sv.price?" · "+Number(sv.price).toLocaleString("ru-RU")+" ₽":""));if(selSvc?.id===sv.id)o.selected=true;return o;}),
-        h("option",{value:"__new__",selected:showNewSvcFlag},"+ Создать новую услугу...")
-      )
-    ));
-    // New service inline form — show when no services or __new__ explicitly selected
-    if(S.services.length===0||showNewSvcFlag){
-      if(S.services.length===0)body.appendChild(h("div",{cls:"alert alert-warn",sty:{marginBottom:8}},"Нет услуг. Создайте первую:"));
-      const newSvcWrap=h("div",{cls:"card",sty:{marginBottom:12}});
-      const svcName=h("input",{cls:"fi",placeholder:"Название услуги *",sty:{marginBottom:8}});
-      const svcPrice=h("input",{cls:"fi",type:"number",placeholder:"Стоимость, ₽",sty:{marginBottom:8}});
-      const svcDur=h("input",{cls:"fi",type:"number",placeholder:"Длительность, мин",sty:{marginBottom:8}});
-      newSvcWrap.appendChild(h("div",{sty:{fontWeight:700,marginBottom:8}},"Новая услуга"));
-      newSvcWrap.appendChild(h("div",{sty:{display:"grid",gridTemplateColumns:"1fr 1fr",gap:8}},
-        h("div",{cls:"fg"},h("label",{cls:"fl"},"Название *"),svcName),
-        h("div",{cls:"fg"},h("label",{cls:"fl"},"Стоимость (₽)"),svcPrice)
+    const slots=(S.schedule[selDate]?.slots||[]).filter(s=>s.available&&(selDate!==today()||s.time>=nowHHMM));
+    slotArea.innerHTML="";slotArea.appendChild(h("label",{cls:"fl"},"Время"));
+    if(!slots.length){slotArea.appendChild(h("div",{sty:{fontSize:13,color:"var(--mu)",padding:"8px 0"}},"Нет свободных слотов на эту дату"));return;}
+    const grid=h("div",{sty:{display:"flex",flexWrap:"wrap"}});
+    slots.forEach(s=>{
+      const isSel=selSlot?.id===s.id;
+      const el=h("div",{cls:"slt fr",sty:{background:isSel?"var(--p)":"",color:isSel?"#fff":""}},
+        s.time,s.clinic?h("div",{cls:"slt-name"},s.clinic):null);
+      el.onclick=()=>{selSlot=s;rebSlots();rebBook();};
+      grid.appendChild(el);
+    });
+    slotArea.appendChild(grid);
+  }
+
+  // ─── Service + new service + book button (rebuilt on svc change only) ─────
+  const svcArea=h("div",{});
+  body.appendChild(svcArea);
+  const svcNameI=h("input",{cls:"fi",placeholder:"Название услуги *",sty:{marginBottom:8}});
+  const svcPriceI=h("input",{cls:"fi",type:"number",placeholder:"Стоимость, ₽",sty:{marginBottom:8}});
+  const svcDurI=h("input",{cls:"fi",type:"number",placeholder:"Длительность, мин",sty:{marginBottom:8}});
+  const durOverI=h("input",{cls:"fi",type:"number"});
+  durOverI.oninput=e=>customDur=parseInt(e.target.value)||30;
+
+  function rebBook(){
+    svcArea.innerHTML="";
+    // Service select
+    const svcSel=h("select",{cls:"fi"});
+    svcSel.appendChild(h("option",{value:""},"— Выберите услугу —"));
+    S.services.forEach(sv=>{const o=h("option",{value:sv.id},sv.name+(sv.price?" · "+Number(sv.price).toLocaleString("ru-RU")+" ₽":""));if(selSvc?.id===sv.id)o.selected=true;svcSel.appendChild(o);});
+    svcSel.appendChild(h("option",{value:"__new__",selected:showNewSvc},"+ Создать новую услугу..."));
+    svcSel.onchange=e=>{
+      if(e.target.value==="__new__"){showNewSvc=true;selSvc=null;}
+      else{selSvc=S.services.find(sv=>sv.id===e.target.value)||null;customDur=selSvc?.duration||null;showNewSvc=false;}
+      rebBook();
+    };
+    svcArea.appendChild(h("div",{cls:"fg"},h("label",{cls:"fl"},"Услуга"),svcSel));
+
+    // New service form (inputs are persistent — don't recreate them)
+    if(showNewSvc||S.services.length===0){
+      if(S.services.length===0)svcArea.appendChild(h("div",{cls:"alert alert-warn",sty:{marginBottom:8}},"Нет услуг. Создайте первую:"));
+      const newSvcCard=h("div",{cls:"card",sty:{marginBottom:12}});
+      newSvcCard.appendChild(h("div",{sty:{fontWeight:700,marginBottom:8}},"Новая услуга"));
+      newSvcCard.appendChild(h("div",{sty:{display:"grid",gridTemplateColumns:"1fr 1fr",gap:8}},
+        h("div",{cls:"fg"},h("label",{cls:"fl"},"Название *"),svcNameI),
+        h("div",{cls:"fg"},h("label",{cls:"fl"},"Стоимость (₽)"),svcPriceI)
       ));
-      newSvcWrap.appendChild(h("div",{cls:"fg"},h("label",{cls:"fl"},"Длительность (мин)"),svcDur));
-      newSvcWrap.appendChild(h("button",{cls:"btn bp bsm",onclick:()=>{
-        if(!svcName.value.trim())return;
-        const sv={id:uid(),name:svcName.value.trim(),price:svcPrice.value||"",duration:parseInt(svcDur.value)||30};
+      newSvcCard.appendChild(h("div",{cls:"fg"},h("label",{cls:"fl"},"Длительность (мин)"),svcDurI));
+      newSvcCard.appendChild(h("button",{cls:"btn bp bsm",onclick:()=>{
+        if(!svcNameI.value.trim())return;
+        const sv={id:uid(),name:svcNameI.value.trim(),price:svcPriceI.value||"",duration:parseInt(svcDurI.value)||30};
         S.services=[...S.services,sv];triggerSave(["services"]);
-        selSvc=sv;customDur=sv.duration;showNewSvcFlag=false;build();
+        selSvc=sv;customDur=sv.duration;showNewSvc=false;
+        svcNameI.value="";svcPriceI.value="";svcDurI.value="";
+        rebBook();
       }},"Создать и выбрать"));
-      body.appendChild(newSvcWrap);
+      svcArea.appendChild(newSvcCard);
     }
+
     // Duration override
     if(selSvc){
-      const durI=h("input",{cls:"fi",type:"number",value:customDur||selSvc.duration||30,onchange:e=>customDur=parseInt(e.target.value)||30});
-      body.appendChild(h("div",{cls:"fg"},h("label",{cls:"fl"},"Длительность (мин)"),durI));
+      durOverI.value=customDur||selSvc.duration||30;
+      svcArea.appendChild(h("div",{cls:"fg"},h("label",{cls:"fl"},"Длительность (мин)"),durOverI));
     }
+
     // Book button
-    const canBook=selSlot&&selSvc;
-    body.appendChild(h("button",{cls:"btn bp bw",disabled:!canBook,onclick:async()=>{
+    const canBook=!!(selSlot&&selSvc);
+    const bookBtn=h("button",{cls:"btn bp bw",onclick:async()=>{
       if(!selSlot||!selSvc)return;
       const dur=customDur||selSvc.duration||30;
       const upSlot={...selSlot,available:false,patientId:p.id,patientName:p.name,serviceId:selSvc.id,serviceName:selSvc.name,serviceDuration:dur};
       const ns={...S.schedule,[selDate]:{...S.schedule[selDate],slots:(S.schedule[selDate]?.slots||[]).map(s=>s.id!==selSlot.id?s:upSlot)}};
-      const upPat=S.patients.map(pr=>pr.id!==p.id?pr:{...pr,status:pr.status==="new"?"scheduled":pr.status});
-      S.patients=upPat;S.schedule=ns;triggerSave(["patients","schedule"]);
+      S.patients=S.patients.map(pr=>pr.id!==p.id?pr:{...pr,status:pr.status==="new"?"scheduled":pr.status});
+      S.schedule=ns;triggerSave(["patients","schedule"]);
       close();render();
-    }},canBook?"Записать на "+selSlot.time+" · "+fmtD(selDate):"Выберите время и услугу"));
-    overlay=h("div",{cls:"overlay",onclick:e=>{if(e.target===overlay)close();}},body);
-    document.getElementById("app").appendChild(overlay);
+    }},canBook?"✓ Записать на "+selSlot.time+" · "+fmtD(selDate):"Выберите время и услугу");
+    bookBtn.disabled=!canBook;
+    svcArea.appendChild(bookBtn);
   }
-  build();
+
+  rebDates();rebSlots();rebBook();
+  overlay=h("div",{cls:"overlay",onclick:e=>{if(e.target===overlay)close();}},body);
+  document.getElementById("app").appendChild(overlay);
 }
 
 // ===================== SCHEDULE =====================
@@ -792,7 +879,11 @@ function renderSchedule(role){
             ),
             h("button",{cls:"btn br bsm",onclick:async()=>{
               const nb=(day.blocks||[]).filter(b=>b.id!==blk.id);
-              S.schedule={...S.schedule,[SCR.schDate]:{...day,blocks:nb}};
+              // Regenerate slots from remaining blocks, keep booked ones
+              const bookedSlots=(day.slots||[]).filter(s=>!s.available&&s.patientId);
+              let newSlots=[];nb.forEach(b=>newSlots=[...newSlots,...generateSlots(b)]);
+              const merged=mergeSlots(bookedSlots,newSlots);
+              S.schedule={...S.schedule,[SCR.schDate]:{...day,blocks:nb,slots:merged}};
               triggerSave(["schedule"]);rebSlots();
             }},"Удалить")
           ));
@@ -814,9 +905,17 @@ function renderSchedule(role){
       bForm.appendChild(h("div",{sty:{display:"flex",gap:8}},
         h("button",{cls:"btn bp",sty:{flex:1},onclick:async()=>{
           const clinic=cSel.value||cC.value||"";
+          const fromMin=fT.value.split(":").reduce((a,b,i)=>i?a+parseInt(b):parseInt(b)*60,0);
+          const toMin=tT.value.split(":").reduce((a,b,i)=>i?a+parseInt(b):parseInt(b)*60,0);
+          const curDay=S.schedule[SCR.schDate]||{blocks:[],slots:[]};
+          const overlap=(curDay.blocks||[]).find(b=>{
+            const bFrom=b.fromTime.split(":").reduce((a,v,i)=>i?a+parseInt(v):parseInt(v)*60,0);
+            const bTo=b.toTime.split(":").reduce((a,v,i)=>i?a+parseInt(v):parseInt(v)*60,0);
+            return fromMin<bTo&&toMin>bFrom;
+          });
+          if(overlap){slWrap.insertBefore(h("div",{cls:"alert alert-err",sty:{marginBottom:8}},"⚠️ Этот блок пересекается с "+overlap.fromTime+"–"+overlap.toTime+". Измените время."),addBBtn);return;}
           const newBlock={id:uid(),fromTime:fT.value,toTime:tT.value,clinic,slotDuration:parseInt(durI.value)||30};
           const newSlots=generateSlots(newBlock);
-          const curDay=S.schedule[SCR.schDate]||{blocks:[],slots:[]};
           const merged=mergeSlots(curDay.slots||[],newSlots);
           const newBlocks=[...(curDay.blocks||[]),newBlock];
           S.schedule={...S.schedule,[SCR.schDate]:{blocks:newBlocks,slots:merged}};
@@ -860,7 +959,14 @@ function renderSchedule(role){
           pp?h("button",{cls:"btn bp",sty:{flex:1},onclick:()=>{detWrap.innerHTML="";detWrap.appendChild(renderPatDetail(pp,role,()=>detWrap.innerHTML=""));}},"Открыть карточку"):null,
           h("button",{cls:"btn bs",onclick:async()=>{
             const ns={...S.schedule,[SCR.schDate]:{...S.schedule[SCR.schDate],slots:(S.schedule[SCR.schDate]?.slots||[]).map(sl=>sl.id!==s.id?sl:{...sl,available:true,patientId:null,patientName:null,serviceId:null,serviceName:null})}};
-            S.schedule=ns;triggerSave(["schedule"]);rebSlots();
+            S.schedule=ns;
+            // Update patient status to cancelled if they were just scheduled
+            if(s.patientId){
+              S.patients=S.patients.map(pr=>pr.id!==s.patientId?pr:{...pr,status:pr.status==="scheduled"?"cancelled":pr.status});
+              cacheSet("patients",S.patients);apiPost("patients",S.patients);
+            }
+            cacheSet("schedule",S.schedule);apiPost("schedule",S.schedule);_pendingKeys.delete("schedule");
+            rebSlots();
           }},"Освободить"),
           h("button",{cls:"btn bs",onclick:()=>detWrap.innerHTML=""},"✕")
         ));
@@ -928,7 +1034,11 @@ function renderSchedule(role){
             const upSlot={...s,available:false,patientId:selPat.id,patientName:selPat.name,serviceId:selSvc.id,serviceName:selSvc.name,serviceDuration:dur};
             S.patients=S.patients.map(pr=>pr.id!==selPat.id?pr:{...pr,status:pr.status==="new"?"scheduled":pr.status});
             S.schedule={...S.schedule,[SCR.schDate]:{...S.schedule[SCR.schDate],slots:(S.schedule[SCR.schDate]?.slots||[]).map(sl=>sl.id!==s.id?sl:upSlot)}};
-            triggerSave(["patients","schedule"]);detWrap.innerHTML="";rebSlots();
+            cacheSet("patients",S.patients);apiPost("patients",S.patients);
+            cacheSet("schedule",S.schedule);apiPost("schedule",S.schedule);
+            _pendingKeys.delete("patients");_pendingKeys.delete("schedule");
+            S.sync="ok";setTimeout(()=>updateSyncBars(),100);
+            detWrap.innerHTML="";rebSlots();
           }},canBook?"✓ Записать на приём":"Выберите пациента и услугу");
           bookBtn.disabled=!canBook;
           bookWrap.appendChild(h("div",{sty:{marginBottom:8}},bookBtn));
@@ -1213,7 +1323,8 @@ function renderDoctor(){
     // Recompute live data on each navigation
     const todaySl=(S.schedule[td]?.slots||[]).filter(s=>!s.available&&s.patientId);
     const needC=S.patients.filter(p=>p.nextContact&&p.nextContact<=td);
-    const upOps=S.patients.filter(p=>p.opDate&&p.opDate>=td).sort((a,b)=>a.opDate.localeCompare(b.opDate));
+    const todayPatIds=new Set((S.schedule[td]?.slots||[]).filter(s=>!s.available&&s.patientId).map(s=>s.patientId));
+    const upOps=S.patients.filter(p=>p.opDate&&p.opDate>=td&&!todayPatIds.has(p.id)).sort((a,b)=>a.opDate.localeCompare(b.opDate));
     sb.querySelectorAll(".si").forEach((b,i)=>{if(i<navItems.length)b.className="si"+(navItems[i].k===SCR.dview&&!SCR.editId?" on":"");});
     main.innerHTML="";
     if(SCR.editId){const p=S.patients.find(x=>x.id===SCR.editId);main.appendChild(renderPatDetail(p,S.session.role,()=>{SCR.editId=null;rebMain();}));}
@@ -1272,7 +1383,7 @@ function docDash(todaySl,needC,upOps,td,reb){
   if(upOps.length){
     wrap.appendChild(h("div",{cls:"st"},"Предстоящие операции"));
     upOps.slice(0,6).forEach(p=>wrap.appendChild(h("div",{cls:"crow",onclick:()=>{SCR.openEdit=true;SCR.editId=p.id;reb();}},
-      h("div",{},h("div",{sty:{fontWeight:600}},p.name),h("div",{sty:{fontSize:12,color:"var(--mu)"}},"🗓 "+(p.opDate?fmtD(p.opDate):p.opDateText||"—")+(p.opPrice?" · "+Number(p.opPrice).toLocaleString("ru-RU")+" ₽":"")))
+      h("div",{},h("div",{sty:{fontWeight:600}},p.name),h("div",{sty:{fontSize:12,color:"var(--mu)"}},"🗓 "+(p.opDate?fmtD(p.opDate):p.opDateText||"—")+(p.opPrice?" · "+fmtPrice(p.opPrice,""):"")))
     )));
   }
   if(!S.patients.length)wrap.appendChild(h("div",{cls:"emp"},h("div",{cls:"empi"},"📋"),h("div",{},"Пациентов пока нет")));
@@ -1302,7 +1413,7 @@ function docPats(td,reb){
       h("td",{},h("div",{sty:{fontWeight:600}},p.name),h("div",{sty:{fontSize:11,color:"#6B7280"}},(p.phone||"")+(p.birthDate?" · "+ageLabel(p.birthDate):""))),
       h("td",{},h("span",{cls:"tag",sty:{background:(s?.c||"#ccc")+"22",color:s?.c}},s?.l)),
       h("td",{},p.opDate?fmtD(p.opDate):(p.opDateText||"—")),
-      h("td",{},p.opPrice?Number(p.opPrice).toLocaleString("ru-RU")+" ₽":"—"),
+      h("td",{},p.opPrice?fmtPrice(p.opPrice,""):"—"),
       h("td",{sty:{color:p.nextContact&&p.nextContact<=td?"#D97706":"inherit"}},p.nextContact?fmtD(p.nextContact):"—")
     ));});
     tbl.appendChild(tb);inner.appendChild(tbl);
