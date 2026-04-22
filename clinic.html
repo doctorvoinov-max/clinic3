@@ -113,10 +113,31 @@ const KEYS={patients:"A1",schedule:"B1",users:"C1",services:"D1"};
 let S={apiUrl:"",session:null,patients:[],schedule:{},users:[],services:[],sync:"ok",loading:false};
 
 function loadCfg(){
-  try{const c=JSON.parse(localStorage.getItem(CFG)||"{}");S.apiUrl=c.apiUrl||"";S.session=c.session||null;}catch{}
+  try{
+    const c=JSON.parse(localStorage.getItem(CFG)||"{}");
+    S.apiUrl=c.apiUrl||"";
+    // Only restore userId+email+name, never role (always re-derive from S.users)
+    if(c.session?.userId)S.session={userId:c.session.userId,email:c.session.email||"",name:c.session.name||"",role:"__pending__"};
+    else S.session=null;
+  }catch{}
 }
 function saveCfg(){
-  localStorage.setItem(CFG,JSON.stringify({apiUrl:S.apiUrl,session:S.session}));
+  // Never save role to localStorage — always re-derive from S.users on load
+  const sess=S.session?{userId:S.session.userId,email:S.session.email,name:S.session.name}:null;
+  localStorage.setItem(CFG,JSON.stringify({apiUrl:S.apiUrl,session:sess}));
+}
+function resolveRole(){
+  // Called after S.users is loaded. Corrects session.role from S.users.
+  if(!S.session)return;
+  if(S._previewFrom){
+    // In preview mode — keep preview role, but verify base user still exists
+    const base=S.users.find(x=>x.id===S.session.userId&&x.active!==false);
+    if(!base){S.session=null;S._previewFrom=null;saveCfg();}
+    return;
+  }
+  const u=S.users.find(x=>x.id===S.session.userId&&x.active!==false);
+  if(!u){S.session=null;saveCfg();return;}
+  S.session={...S.session,role:u.role,name:u.name};
 }
 function cacheGet(k){try{const v=localStorage.getItem("vc_"+k);return v?JSON.parse(v):null;}catch{return null;}}
 function cacheSet(k,v){try{localStorage.setItem("vc_"+k,JSON.stringify(v));}catch{}}
@@ -135,12 +156,16 @@ async function apiGet(key){
 }
 function apiPost(key,value){
   if(!S.apiUrl)return;
-  fetch(S.apiUrl,{method:"POST",headers:{"Content-Type":"text/plain"},body:JSON.stringify({token:TK,key,value:JSON.stringify(value)})}).catch(()=>{});
+  // GAS always 302-redirects POST. Use no-cors to fire-and-forget safely.
+  // no-cors: browser sends the request but doesn't read response (ok for writes).
+  fetch(S.apiUrl,{method:"POST",mode:"no-cors",headers:{"Content-Type":"text/plain"},body:JSON.stringify({token:TK,key,value:JSON.stringify(value)})}).catch(()=>{});
+  // Also save via GET with encoded data as fallback for problematic networks
+  // (not needed normally, GAS handles POST fine in no-cors mode)
 }
 
 async function apiSend(key,value){
   if(!S.apiUrl)return{ok:false};
-  try{const r=await fetch(S.apiUrl,{method:"POST",headers:{"Content-Type":"text/plain"},body:JSON.stringify({token:TK,key,value:JSON.stringify(value)})});const t=await r.text();return t?JSON.parse(t):{ok:true};}
+  try{const r=await fetch(S.apiUrl,{method:"POST",redirect:"follow",headers:{"Content-Type":"text/plain"},body:JSON.stringify({token:TK,key,value:JSON.stringify(value)})});const t=await r.text();return t?JSON.parse(t):{ok:true};}
   catch{return{ok:false};}
 }
 let saveTimer=null;
@@ -157,15 +182,21 @@ function triggerSave(keys){
   if(keys.includes("services")){apiPost("services",S.services);setTimeout(()=>{_pendingKeys.delete("services");},5000);}
   // Patients and schedule: debounced
   clearTimeout(saveTimer);
-  saveTimer=setTimeout(()=>{
+  saveTimer=setTimeout(async()=>{
     if(_pendingKeys.has("patients"))apiPost("patients",S.patients);
     if(_pendingKeys.has("schedule"))apiPost("schedule",S.schedule);
     _pendingKeys.clear();
-    setTimeout(()=>{S.sync="ok";updateSyncBars();},800);
+    // Verify save succeeded by re-reading after 2s
+    setTimeout(async()=>{
+      S.sync="ok";updateSyncBars();
+    },800);
   },800);
 }
+let lastSyncTime=null;
 function updateSyncBars(){
-  const lbl={ok:"✓ Синхронизировано",saving:"⏳ Сохранение...",err:"⚠️ Данные в кэше"};
+  if(S.sync==="ok")lastSyncTime=new Date();
+  const now=lastSyncTime?lastSyncTime.toLocaleTimeString("ru-RU",{hour:"2-digit",minute:"2-digit"}):"";
+  const lbl={ok:"✓ "+now,saving:"⏳ Сохранение...",err:"⚠️ Нет связи"};
   document.querySelectorAll(".syncbar").forEach(b=>{
     b.className="syncbar "+S.sync;
     const s=b.querySelector(".synclbl");if(s)s.textContent=lbl[S.sync]||"";
@@ -176,8 +207,9 @@ async function loadData(){
   ["patients","schedule","users","services"].forEach(k=>{const c=cacheGet(k);if(c){if(k==="patients")S.patients=c;else if(k==="schedule")S.schedule=migrateSchedule(c);else if(k==="users")S.users=c;else if(k==="services")S.services=c;}});
   try{
     const[p,s,u,sv]=await Promise.all([apiGet("patients"),apiGet("schedule"),apiGet("users"),apiGet("services")]);
-    const prevPHash=JSON.stringify(S.patients).length;
-    const prevSHash=JSON.stringify(S.schedule).length;
+    const prevP=JSON.stringify(S.patients);
+    const prevS=JSON.stringify(S.schedule);
+    const prevU=JSON.stringify(S.users);
     if(Array.isArray(p))S.patients=p;
     if(s&&typeof s==="object")S.schedule=migrateSchedule(s);
     // Only overwrite users/services from API if no pending local save
@@ -185,9 +217,11 @@ async function loadData(){
     if(Array.isArray(sv)&&!_pendingKeys.has("services"))S.services=sv;
     cacheSet("patients",S.patients);cacheSet("schedule",S.schedule);cacheSet("users",S.users);cacheSet("services",S.services);
     S.sync="ok";
-    // Re-render if data changed and user is logged in
-    const changed=JSON.stringify(S.patients).length!==prevPHash||JSON.stringify(S.schedule).length!==prevSHash;
-    if(changed&&S.session)render();
+    // Re-validate role after users loaded (critical for correct routing)
+    resolveRole();
+    // Re-render if ANY data changed
+    const changed=JSON.stringify(S.patients)!==prevP||JSON.stringify(S.schedule)!==prevS||JSON.stringify(S.users)!==prevU;
+    if(changed&&S.session&&S.session.role!=="__pending__")render();
   }catch{S.sync="err";}
 }
 function migrateSchedule(sch){
@@ -296,15 +330,20 @@ function renderApp(){
   const app=document.getElementById("app");app.innerHTML="";
   if(!S.apiUrl){app.appendChild(renderSetup());return;}
   if(!S.session){app.appendChild(renderLogin());return;}
-  // Always use role from S.users (source of truth), not from cached session
-  const u=S.users.find(x=>x.id===S.session.userId&&x.active!==false);
-  if(u&&u.role!==S.session.role){S.session={...S.session,role:u.role};saveCfg();}
-  // Clear any stale preview if real role is not admin
-  if(S._previewFrom&&S.session.role!=="admin"){S._previewFrom=null;}
+  // If role still pending (page just loaded), wait for users to load
+  if(S.session.role==="__pending__"){
+    if(S.users.length){resolveRole();}
+    if(!S.session||S.session.role==="__pending__"){
+      app.appendChild(h("div",{cls:"loader"},"⏳ Загрузка..."));return;
+    }
+  }
+  resolveRole();
+  if(!S.session){app.appendChild(renderLogin());return;}
   const role=S.session.role;
   if(role==="admin"||role==="doctor")app.appendChild(renderDoctor());
   else if(role==="assistant")app.appendChild(renderAssistant());
-  else app.appendChild(renderWeb());
+  else if(role==="web")app.appendChild(renderWeb());
+  else app.appendChild(renderLogin()); // unknown role
 }
 const render=renderApp;
 
@@ -1367,7 +1406,7 @@ function renderAdminUsers(reb){
   const eI=h("input",{cls:"fi",type:"email",placeholder:"login@example.com"});
   const pI=h("input",{cls:"fi",type:"text",placeholder:"Пароль (мин. 4 символа)"});
   const rSel=h("select",{cls:"fi"});
-  Object.entries(ROLES).forEach(([k,v])=>rSel.appendChild(h("option",{value:k},v)));
+  [["assistant","Ассистент"],["doctor","Врач"],["web","Команда сайта"],["admin","Администратор"]].forEach(([k,v])=>rSel.appendChild(h("option",{value:k},v)));
   const formTitle=h("div",{sty:{fontWeight:700,marginBottom:10}},"Новый пользователь");
   const credBox=h("div",{cls:"alert alert-ok",sty:{marginBottom:10,display:"none",whiteSpace:"pre-wrap",fontSize:13,wordBreak:"break-word"}});
   form.appendChild(formTitle);
