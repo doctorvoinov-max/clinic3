@@ -177,20 +177,18 @@ function triggerSave(keys){
   if(keys.includes("schedule"))cacheSet("schedule",S.schedule);
   if(keys.includes("users"))cacheSet("users",S.users);
   if(keys.includes("services"))cacheSet("services",S.services);
-  // Users and services: save immediately (no debounce) to avoid race on reload
-  if(keys.includes("users")){apiPost("users",S.users);setTimeout(()=>{_pendingKeys.delete("users");},5000);}
-  if(keys.includes("services")){apiPost("services",S.services);setTimeout(()=>{_pendingKeys.delete("services");},5000);}
-  // Patients and schedule: debounced
+  // ALL keys save immediately — no debounce
+  if(keys.includes("patients"))apiPost("patients",S.patients);
+  if(keys.includes("schedule"))apiPost("schedule",S.schedule);
+  if(keys.includes("users")){apiPost("users",S.users);setTimeout(()=>_pendingKeys.delete("users"),5000);}
+  if(keys.includes("services")){apiPost("services",S.services);setTimeout(()=>_pendingKeys.delete("services"),5000);}
+  // Clear pending after 3s (time for GAS to process)
   clearTimeout(saveTimer);
-  saveTimer=setTimeout(async()=>{
-    if(_pendingKeys.has("patients"))apiPost("patients",S.patients);
-    if(_pendingKeys.has("schedule"))apiPost("schedule",S.schedule);
-    _pendingKeys.clear();
-    // Verify save succeeded by re-reading after 2s
-    setTimeout(async()=>{
-      S.sync="ok";updateSyncBars();
-    },800);
-  },800);
+  saveTimer=setTimeout(()=>{
+    _pendingKeys.delete("patients");
+    _pendingKeys.delete("schedule");
+    S.sync="ok";updateSyncBars();
+  },3000);
 }
 let lastSyncTime=null;
 function updateSyncBars(){
@@ -210,9 +208,10 @@ async function loadData(){
     const prevP=JSON.stringify(S.patients);
     const prevS=JSON.stringify(S.schedule);
     const prevU=JSON.stringify(S.users);
-    if(Array.isArray(p))S.patients=p;
-    if(s&&typeof s==="object")S.schedule=migrateSchedule(s);
-    // Only overwrite users/services from API if no pending local save
+    // Don't overwrite keys that have pending local changes
+    if(Array.isArray(p)&&!_pendingKeys.has("patients"))S.patients=p;
+    else if(Array.isArray(p)&&_pendingKeys.has("patients")){/* keep local version */}
+    if(s&&typeof s==="object"&&!_pendingKeys.has("schedule"))S.schedule=migrateSchedule(s);
     if(Array.isArray(u)&&!_pendingKeys.has("users"))S.users=u;
     if(Array.isArray(sv)&&!_pendingKeys.has("services"))S.services=sv;
     cacheSet("patients",S.patients);cacheSet("schedule",S.schedule);cacheSet("users",S.users);cacheSet("services",S.services);
@@ -221,7 +220,8 @@ async function loadData(){
     resolveRole();
     // Re-render if ANY data changed
     const changed=JSON.stringify(S.patients)!==prevP||JSON.stringify(S.schedule)!==prevS||JSON.stringify(S.users)!==prevU;
-    if(changed&&S.session&&S.session.role!=="__pending__")render();
+    // Only re-render from background load if no pending local writes
+    if(changed&&S.session&&S.session.role!=="__pending__"&&_pendingKeys.size===0)render();
   }catch{S.sync="err";}
 }
 function migrateSchedule(sch){
@@ -1837,8 +1837,17 @@ function renderWeb(){
 }
 
 // ===================== INIT =====================
-window.addEventListener("focus",()=>{if(S.apiUrl&&!S.loading)loadData().then(()=>{updateSyncBars();if(S.session)render();});});
-setInterval(()=>{if(S.apiUrl&&!S.loading&&S.session)loadData().then(()=>{updateSyncBars();render();});},30000);
+window.addEventListener("focus",()=>{
+  if(S.apiUrl&&!S.loading)loadData().then(()=>{
+    updateSyncBars();
+    // Only re-render on focus if no pending writes (avoid flickering)
+    if(S.session&&_pendingKeys.size===0)render();
+  });
+});
+setInterval(()=>{
+  if(S.apiUrl&&!S.loading&&S.session&&_pendingKeys.size===0)
+    loadData().then(()=>{updateSyncBars();render();});
+},15000);
 loadCfg();
 if(!S.apiUrl){render();}
 else{loadData().then(()=>{
