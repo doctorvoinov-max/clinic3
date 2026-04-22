@@ -224,7 +224,9 @@ async function loadData(){
     const changed=JSON.stringify(S.patients)!==prevP||JSON.stringify(S.schedule)!==prevS||JSON.stringify(S.users)!==prevU;
     // Only re-render if no pending writes AND enough time passed since last save
     const safeTorerender=_pendingKeys.size===0&&(Date.now()-S._lastSaveMs>10000);
-    if(changed&&S.session&&S.session.role!=="__pending__"&&safeTorerender)render();
+    // Don't re-render if user is actively editing a patient (would reset form fields)
+    const userIsEditing=!!(SCR.editId||SCR.sub==="pat");
+    if(changed&&S.session&&S.session.role!=="__pending__"&&safeTorerender&&!userIsEditing)render();
   }catch{S.sync="err";}
 }
 function migrateSchedule(sch){
@@ -471,14 +473,18 @@ function patCard(p,onClick){
 // ===================== PATIENT DETAIL =====================
 function renderPatDetail(p,role,onBack){
   if(!p)return h("div",{},"Пациент не найден");
-  let curTab=SCR.openTaskId?"tasks":SCR.openEdit?"edit":"info";
+  // Restore tab from SCR.patTab if same patient, else determine fresh
+  const samePat=SCR._lastPatId===p.id;
+  let curTab=SCR.openTaskId?"tasks":SCR.openEdit?"edit":(samePat&&SCR.patTab?SCR.patTab:"info");
   SCR.openEdit=false;
+  SCR._lastPatId=p.id;
   const tbEl=h("div",{cls:"tabs"});
   const cEl=h("div",{});
   const activeCnt=(p.tasks||[]).filter(t=>!t.completed).length;
   const tabs=role==="web"?[["info","Инфо"]]:[["info","Инфо"],["tasks","Задачи"+(activeCnt>0?" ("+activeCnt+")":"")],["notes","Заметки"],["edit","Редактировать"]];
   function drawTab(t){
     curTab=t||curTab;
+    SCR.patTab=curTab;
     cEl.innerHTML="";
     tbEl.querySelectorAll(".tb").forEach(b=>b.className="tb "+(b.dataset.t===curTab?"on":"off"));
     const pp=S.patients.find(x=>x.id===p.id)||p;
@@ -938,6 +944,7 @@ function renderSchedule(role){
     slWrap.innerHTML="";detWrap.innerHTML="";
     const day=S.schedule[SCR.schDate]||{blocks:[],slots:[]};
     const slots=day.slots||[];
+    // Will restore open slot detail after grid is built (see end of rebSlots)
     const fr=slots.filter(s=>s.available).length;
     slWrap.appendChild(h("div",{sty:{fontSize:13,color:"var(--mu)",marginBottom:10}},fmtF(SCR.schDate)+" · "+fr+" св. / "+slots.length+" всего"));
 
@@ -1013,10 +1020,15 @@ function renderSchedule(role){
         s.clinic&&!s.patientId?h("div",{cls:"slt-name"},s.clinic):null,
         s.patientId?h("div",{cls:"slt-name"},s.patientName?.split(" ")[0]+(s.serviceName?" · "+s.serviceName.substring(0,8):"")):"  "
       );
-      el.onclick=()=>showSlotDetail(s);
+      el.onclick=()=>{SCR.openSlotId=s.id;showSlotDetail(s);};
       grid.appendChild(el);
     });
     slWrap.appendChild(grid);
+    // Restore open slot detail if it was open before re-render
+    if(SCR.openSlotId){
+      const openS=slots.find(sl=>sl.id===SCR.openSlotId);
+      if(openS)setTimeout(()=>showSlotDetail(openS),0);
+    }
 
     function showSlotDetail(s){
       detWrap.innerHTML="";
@@ -1043,7 +1055,7 @@ function renderSchedule(role){
             }
             rebSlots();
           }},"Освободить"),
-          h("button",{cls:"btn bs",onclick:()=>detWrap.innerHTML=""},"✕")
+          h("button",{cls:"btn bs",onclick:()=>{detWrap.innerHTML="";SCR.openSlotId=null;}},"✕")
         ));
       } else if(s.available){
         box.appendChild(h("div",{sty:{fontSize:13,color:"var(--mu)",marginBottom:14}},"Слот свободен"+(s.clinic?" · "+s.clinic:"")));
@@ -1109,7 +1121,7 @@ function renderSchedule(role){
             S.patients=S.patients.map(pr=>pr.id!==selPat.id?pr:{...pr,status:pr.status==="new"?"scheduled":pr.status});
             S.schedule={...S.schedule,[SCR.schDate]:{...S.schedule[SCR.schDate],slots:(S.schedule[SCR.schDate]?.slots||[]).map(sl=>sl.id!==s.id?sl:upSlot)}};
             triggerSave(["patients","schedule"]);
-            detWrap.innerHTML="";rebSlots();
+            SCR.openSlotId=null;detWrap.innerHTML="";rebSlots();
           }},canBook?"✓ Записать на приём":"Выберите пациента и услугу");
           bookBtn.disabled=!canBook;
           bookWrap.appendChild(h("div",{sty:{marginBottom:8}},bookBtn));
@@ -1579,7 +1591,7 @@ function renderDoctor(){
       b.className="si"+(b.dataset.nav===SCR.dview&&!SCR.editId?" on":"");
     });
     main.innerHTML="";
-    if(SCR.editId){const p=S.patients.find(x=>x.id===SCR.editId);main.appendChild(renderPatDetail(p,S.session.role,()=>{SCR.editId=null;rebMain();}));}
+    if(SCR.editId){const p=S.patients.find(x=>x.id===SCR.editId);main.appendChild(renderPatDetail(p,S.session.role,()=>{SCR.editId=null;SCR.patTab=null;SCR._lastPatId=null;rebMain();}));}
     else if(SCR.dview==="dashboard")main.appendChild(docDash(todaySl,needC,upOps,td,rebMain));
     else if(SCR.dview==="patients")main.appendChild(docPats(td,rebMain));
     else if(SCR.dview==="schedule")main.appendChild(renderSchedule(S.session.role));
@@ -1724,7 +1736,7 @@ function renderAssistant(){
     content=u?renderChangePassword(u,()=>{SCR.sub=null;render();}):h("div",{},"");
   }
   else if(SCR.sub==="addpat")content=renderAddPatForm("assistant",()=>{SCR.sub=null;render();});
-  else if(SCR.sub==="pat"&&SCR.editId){const p=S.patients.find(x=>x.id===SCR.editId);content=renderPatDetail(p,"assistant",()=>{SCR.sub=null;SCR.editId=null;render();});}
+  else if(SCR.sub==="pat"&&SCR.editId){const p=S.patients.find(x=>x.id===SCR.editId);content=renderPatDetail(p,"assistant",()=>{SCR.sub=null;SCR.editId=null;SCR.patTab=null;SCR._lastPatId=null;render();});}
   else if(SCR.tab==="today")content=renderToday(ov,tT,lT,needC);
   else if(SCR.tab==="pats")content=renderPatsTab();
   else content=renderSchedule("assistant");
@@ -1847,12 +1859,13 @@ function renderWeb(){
 window.addEventListener("focus",()=>{
   if(S.apiUrl&&!S.loading)loadData().then(()=>{
     updateSyncBars();
-    // Only re-render on focus if no pending writes (avoid flickering)
-    if(S.session&&_pendingKeys.size===0)render();
+    const userIsEditing=!!(SCR.editId||SCR.sub==="pat");
+    if(S.session&&_pendingKeys.size===0&&!userIsEditing)render();
   });
 });
 setInterval(()=>{
-  const okToRefresh=_pendingKeys.size===0&&(Date.now()-S._lastSaveMs>10000);
+  const userIsEditing=!!(SCR.editId||SCR.sub==="pat");
+  const okToRefresh=_pendingKeys.size===0&&(Date.now()-S._lastSaveMs>10000)&&!userIsEditing;
   if(S.apiUrl&&!S.loading&&S.session&&okToRefresh)
     loadData().then(()=>{updateSyncBars();render();});
 },15000);
