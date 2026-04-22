@@ -161,8 +161,8 @@ function triggerSave(keys){
     if(_pendingKeys.has("patients"))apiPost("patients",S.patients);
     if(_pendingKeys.has("schedule"))apiPost("schedule",S.schedule);
     _pendingKeys.clear();
-    setTimeout(()=>{S.sync="ok";updateSyncBars();},1000);
-  },2000);
+    setTimeout(()=>{S.sync="ok";updateSyncBars();},800);
+  },800);
 }
 function updateSyncBars(){
   const lbl={ok:"✓ Синхронизировано",saving:"⏳ Сохранение...",err:"⚠️ Данные в кэше"};
@@ -176,6 +176,8 @@ async function loadData(){
   ["patients","schedule","users","services"].forEach(k=>{const c=cacheGet(k);if(c){if(k==="patients")S.patients=c;else if(k==="schedule")S.schedule=migrateSchedule(c);else if(k==="users")S.users=c;else if(k==="services")S.services=c;}});
   try{
     const[p,s,u,sv]=await Promise.all([apiGet("patients"),apiGet("schedule"),apiGet("users"),apiGet("services")]);
+    const prevPHash=JSON.stringify(S.patients).length;
+    const prevSHash=JSON.stringify(S.schedule).length;
     if(Array.isArray(p))S.patients=p;
     if(s&&typeof s==="object")S.schedule=migrateSchedule(s);
     // Only overwrite users/services from API if no pending local save
@@ -183,6 +185,9 @@ async function loadData(){
     if(Array.isArray(sv)&&!_pendingKeys.has("services"))S.services=sv;
     cacheSet("patients",S.patients);cacheSet("schedule",S.schedule);cacheSet("users",S.users);cacheSet("services",S.services);
     S.sync="ok";
+    // Re-render if data changed and user is logged in
+    const changed=JSON.stringify(S.patients).length!==prevPHash||JSON.stringify(S.schedule).length!==prevSHash;
+    if(changed&&S.session)render();
   }catch{S.sync="err";}
 }
 function migrateSchedule(sch){
@@ -291,6 +296,11 @@ function renderApp(){
   const app=document.getElementById("app");app.innerHTML="";
   if(!S.apiUrl){app.appendChild(renderSetup());return;}
   if(!S.session){app.appendChild(renderLogin());return;}
+  // Always use role from S.users (source of truth), not from cached session
+  const u=S.users.find(x=>x.id===S.session.userId&&x.active!==false);
+  if(u&&u.role!==S.session.role){S.session={...S.session,role:u.role};saveCfg();}
+  // Clear any stale preview if real role is not admin
+  if(S._previewFrom&&S.session.role!=="admin"){S._previewFrom=null;}
   const role=S.session.role;
   if(role==="admin"||role==="doctor")app.appendChild(renderDoctor());
   else if(role==="assistant")app.appendChild(renderAssistant());
@@ -1788,11 +1798,17 @@ function renderWeb(){
 }
 
 // ===================== INIT =====================
-window.addEventListener("focus",()=>{if(S.apiUrl&&!S.loading)loadData().then(()=>updateSyncBars());});
-setInterval(()=>{if(S.apiUrl&&!S.loading&&S.session)loadData().then(()=>updateSyncBars());},60000);
+window.addEventListener("focus",()=>{if(S.apiUrl&&!S.loading)loadData().then(()=>{updateSyncBars();if(S.session)render();});});
+setInterval(()=>{if(S.apiUrl&&!S.loading&&S.session)loadData().then(()=>{updateSyncBars();render();});},30000);
 loadCfg();
 if(!S.apiUrl){render();}
-else{loadData().then(()=>{if(!S.session){render();return;}const u=S.users.find(x=>x.id===S.session.userId&&x.active!==false);if(!u){S.session=null;saveCfg();}render();});}
-</script>
+else{loadData().then(()=>{
+  S._previewFrom=null;
+  if(!S.session){render();return;}
+  const u=S.users.find(x=>x.id===S.session.userId&&x.active!==false);
+  if(!u){S.session=null;saveCfg();render();return;}
+  if(u.role!==S.session.role){S.session={...S.session,role:u.role};saveCfg();}
+  render();
+});}</script>
 </body>
 </html>
