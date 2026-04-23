@@ -518,7 +518,7 @@ function patInfo(p,role){
   const s=ST[p.status];
   const statusSel=h("select",{cls:"fi",sty:{marginBottom:12}});
   Object.entries(ST).forEach(([k,v])=>{const o=h("option",{value:k},v.l);if(k===p.status)o.selected=true;statusSel.appendChild(o);});
-  statusSel.onchange=async e=>{await savePats(S.patients.map(pr=>pr.id!==p.id?pr:{...pr,status:e.target.value}),true);};
+  statusSel.onchange=async e=>{await savePats(S.patients.map(pr=>pr.id!==p.id?pr:{...pr,status:e.target.value}),true);if(typeof updateDashLive==="function")updateDashLive();};
   const rows=[
     p.birthDate&&["Дата рождения",fmtD(p.birthDate)+(p.birthDate?" ("+ageLabel(p.birthDate)+")":"")],
     p.phone&&["Контакты",p.phone],
@@ -680,6 +680,8 @@ function patEditForm(p,role,onSaved){
       f.tasks=newTasks;
       await savePats(S.patients.map(pr=>pr.id===f.id?f:pr),true);
       onSaved&&onSaved();
+      // Refresh dashboard stats without scrolling (updateDashLive is defined in renderDoctor scope)
+      if(typeof updateDashLive==="function")updateDashLive();
     }},"Сохранить"),
     h("button",{cls:"btn bs",onclick:()=>onSaved&&onSaved()},"Отмена")
   );
@@ -1575,7 +1577,8 @@ function renderAdminServices(reb){
 // ===================== SAVE HELPERS =====================
 async function savePats(arr,noRender){
   S.patients=arr;cacheSet("patients",arr);triggerSave(["patients"]);
-  if(!noRender)render();
+  // Never call render() from here — it scrolls mobile to top.
+  // Callers must explicitly trigger their own refresh (rebMain, drawTab, etc.)
 }
 
 // ===================== DOCTOR / ADMIN =====================
@@ -1630,8 +1633,8 @@ function renderDoctor(){
     h("span",{sty:{fontSize:18}},"🚪"),h("span",{cls:"si-lbl"},"Выход")));
   sb.appendChild(footer);
   const main=h("div",{cls:"dmain"});
-  function rebMain(){
-    // Recompute live data on each navigation
+  // Live data helpers — called in rebMain and updateDashLive
+  function computeLiveData(){
     const todaySl=(S.schedule[td]?.slots||[]).filter(s=>!s.available&&s.patientId).map(s=>{
       const pat=S.patients.find(x=>x.id===s.patientId);
       return {...s,_patStatus:pat?.status};
@@ -1639,12 +1642,39 @@ function renderDoctor(){
     const needC=S.patients.filter(p=>p.nextContact&&p.nextContact<=td);
     const todayPatIds=new Set((S.schedule[td]?.slots||[]).filter(s=>!s.available&&s.patientId).map(s=>s.patientId));
     const upOps=S.patients.filter(p=>p.opDate&&p.opDate>=td&&!todayPatIds.has(p.id)).sort((a,b)=>a.opDate.localeCompare(b.opDate));
-    // Update nav active state by data attribute
+    return{todaySl,needC,upOps};
+  }
+
+  // Targeted dashboard refresh WITHOUT clearing main or scrolling
+  function updateDashLive(){
+    const{todaySl,needC,upOps}=computeLiveData();
+    // Only update if dashboard is currently shown (no patient open)
+    if(SCR.dview==="dashboard"&&!SCR.editId){
+      const scrollY=main.scrollTop;
+      main.innerHTML="";
+      main.appendChild(docDash(todaySl,needC,upOps,td,rebMain));
+      main.scrollTop=scrollY;
+    }
+    // Always update nav badge and sidebar counts
     sb.querySelectorAll(".si[data-nav]").forEach(b=>{
       b.className="si"+(b.dataset.nav===SCR.dview&&!SCR.editId?" on":"");
     });
+  }
+
+  function rebMain(preserveScroll){
+    const{todaySl,needC,upOps}=computeLiveData();
+    sb.querySelectorAll(".si[data-nav]").forEach(b=>{
+      b.className="si"+(b.dataset.nav===SCR.dview&&!SCR.editId?" on":"");
+    });
+    // Preserve scroll position to avoid mobile scroll-to-top
+    const scrollY=preserveScroll?main.scrollTop:0;
     main.innerHTML="";
-    if(SCR.editId){const p=S.patients.find(x=>x.id===SCR.editId);main.appendChild(renderPatDetail(p,S.session.role,()=>{SCR.editId=null;SCR.patTab=null;SCR._lastPatId=null;rebMain();}));}
+    if(SCR.editId){
+      const p=S.patients.find(x=>x.id===SCR.editId);
+      main.appendChild(renderPatDetail(p,S.session.role,()=>{
+        SCR.editId=null;SCR.patTab=null;SCR._lastPatId=null;rebMain();
+      }));
+    }
     else if(SCR.dview==="dashboard")main.appendChild(docDash(todaySl,needC,upOps,td,rebMain));
     else if(SCR.dview==="patients")main.appendChild(docPats(td,rebMain));
     else if(SCR.dview==="schedule")main.appendChild(renderSchedule(S.session.role));
@@ -1670,6 +1700,7 @@ function renderDoctor(){
       main.appendChild(h("h2",{sty:{fontSize:22,fontWeight:800,marginBottom:16}},"Администратор"));
       main.appendChild(adminTabs);main.appendChild(adminMain);
     }
+    if(scrollY)requestAnimationFrame(()=>{main.scrollTop=scrollY;});
   }
   rebMain();wrap.appendChild(sb);wrap.appendChild(main);return wrap;
 }
@@ -1789,7 +1820,15 @@ function renderAssistant(){
     content=u?renderChangePassword(u,()=>{SCR.sub=null;render();}):h("div",{},"");
   }
   else if(SCR.sub==="addpat")content=renderAddPatForm("assistant",()=>{SCR.sub=null;render();});
-  else if(SCR.sub==="pat"&&SCR.editId){const p=S.patients.find(x=>x.id===SCR.editId);content=renderPatDetail(p,"assistant",()=>{SCR.sub=null;SCR.editId=null;SCR.patTab=null;SCR._lastPatId=null;render();});}
+  else if(SCR.sub==="pat"&&SCR.editId){
+  const p=S.patients.find(x=>x.id===SCR.editId);
+  content=renderPatDetail(p,"assistant",()=>{
+    SCR.sub=null;SCR.editId=null;SCR.patTab=null;SCR._lastPatId=null;
+    // Scroll to top ONLY when going back, not on internal save
+    window.scrollTo&&window.scrollTo(0,0);
+    render();
+  });
+}
   else if(SCR.tab==="today")content=renderToday(ov,tT,lT,needC);
   else if(SCR.tab==="pats")content=renderPatsTab();
   else content=renderSchedule("assistant");
