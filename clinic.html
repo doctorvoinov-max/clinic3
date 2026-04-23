@@ -43,7 +43,12 @@ textarea.fi{min-height:72px;resize:vertical;font-size:14px}
 .tag{display:inline-block;padding:2px 8px;border-radius:20px;font-size:11px;font-weight:600}
 .slt{display:inline-flex;flex-direction:column;padding:7px 10px;border-radius:8px;font-size:12px;font-weight:600;cursor:pointer;border:1.5px solid transparent;margin:3px;min-width:64px;text-align:center}
 @media(max-width:380px){.slt{min-width:54px;padding:6px 7px;font-size:11px}}
-.slt.fr{background:var(--pll);color:var(--p)}.slt.bk{background:#EEF2FF;color:#4F46E5}.slt.cls{background:#F3F4F6;color:var(--hi);cursor:default}
+.slt.fr{background:var(--pll);color:var(--p)}
+.slt.bk-new{background:#EEF2FF;color:#4F46E5}
+.slt.bk-repeat{background:#FEF3E2;color:#C9720A}
+.slt.bk-done{background:#E8F5F2;color:#059669}
+.slt.bk{background:#EEF2FF;color:#4F46E5}
+.slt.cls{background:#F3F4F6;color:var(--hi);cursor:default}
 .slt-name{font-size:9px;font-weight:500;margin-top:2px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;max-width:74px}
 .dr{display:flex;gap:6px;overflow-x:auto;padding-bottom:4px;margin-bottom:14px;scrollbar-width:none;-webkit-overflow-scrolling:touch}
 .dr::-webkit-scrollbar{display:none}
@@ -225,7 +230,7 @@ async function loadData(){
     // Only re-render if no pending writes AND enough time passed since last save
     const safeTorerender=_pendingKeys.size===0&&(Date.now()-S._lastSaveMs>10000);
     // Don't re-render if user is actively editing a patient (would reset form fields)
-    const userIsEditing=!!(SCR.editId||SCR.sub==="pat");
+    const userIsEditing=!!(SCR.editId||SCR.sub==="pat"||SCR.openSlotId);
     if(changed&&S.session&&S.session.role!=="__pending__"&&safeTorerender&&!userIsEditing)render();
   }catch{S.sync="err";}
 }
@@ -1010,11 +1015,30 @@ function renderSchedule(role){
 
 
 
-    slWrap.appendChild(h("div",{cls:"st"},"Слоты"+(slots.length?" ("+slots.length+")":"")));
+    slWrap.appendChild(h("div",{sty:{display:"flex",alignItems:"center",gap:6,flexWrap:"wrap",marginTop:12,marginBottom:4}},
+      h("div",{cls:"st",sty:{margin:0,marginRight:8}},"Слоты"+(slots.length?" ("+slots.length+")":"")),
+      h("span",{cls:"slt fr bsm",sty:{padding:"2px 8px",fontSize:10,cursor:"default"}},"Свободен"),
+      h("span",{cls:"slt bk-new bsm",sty:{padding:"2px 8px",fontSize:10,cursor:"default"}},"Первичный"),
+      h("span",{cls:"slt bk-repeat bsm",sty:{padding:"2px 8px",fontSize:10,cursor:"default"}},"Повторный"),
+      h("span",{cls:"slt bk-done bsm",sty:{padding:"2px 8px",fontSize:10,cursor:"default"}},"Принят ✓")
+    ));
     if(!slots.length){slWrap.appendChild(h("div",{sty:{fontSize:13,color:"var(--mu)",padding:"10px 0"}},"Нет слотов. Добавьте блок работы."));}
     const grid=h("div",{sty:{display:"flex",flexWrap:"wrap"}});
     slots.forEach(s=>{
-      const cls=s.available?"fr":(s.patientId?"bk":"cls");
+      let cls;
+      if(s.available){
+        cls="fr";
+      } else if(!s.patientId){
+        cls="cls";
+      } else {
+        // Color by patient status
+        const pat=S.patients.find(x=>x.id===s.patientId);
+        const st=pat?.status;
+        if(["consulted","operated","followup","completed"].includes(st))cls="bk-done";
+        else if(st==="preop")cls="bk-repeat";
+        else if(pat?.source==="repeat")cls="bk-repeat";
+        else cls="bk-new";
+      }
       const el=h("div",{cls:"slt "+cls},
         s.time,
         s.clinic&&!s.patientId?h("div",{cls:"slt-name"},s.clinic):null,
@@ -1059,81 +1083,110 @@ function renderSchedule(role){
         ));
       } else if(s.available){
         box.appendChild(h("div",{sty:{fontSize:13,color:"var(--mu)",marginBottom:14}},"Слот свободен"+(s.clinic?" · "+s.clinic:"")));
-        let selPat=null,showNewPat=false,selSvc=null,showNewSvc=false,customDur=null;
-        const bookWrap=h("div",{});box.appendChild(bookWrap);
-        function rebBook(){
-          bookWrap.innerHTML="";
-          // Patient selector
-          const patSel=h("select",{cls:"fi"});
-          patSel.appendChild(h("option",{value:""},"— Выберите пациента —"));
-          [...S.patients].sort((a,b)=>a.name.localeCompare(b.name)).forEach(p=>{const o=h("option",{value:p.id},p.name+(p.phone?" · "+p.phone:""));if(selPat?.id===p.id)o.selected=true;patSel.appendChild(o);});
-          patSel.appendChild(h("option",{value:"__new__"},"+ Создать нового пациента..."));
-          patSel.onchange=e=>{if(e.target.value==="__new__"){showNewPat=true;selPat=null;}else{selPat=S.patients.find(p=>p.id===e.target.value)||null;showNewPat=false;}rebBook();};
-          bookWrap.appendChild(h("div",{cls:"fg"},h("label",{cls:"fl"},"Пациент"),patSel));
-          // New patient mini-form
-          if(showNewPat){
-            const nN=h("input",{cls:"fi",placeholder:"Имя и фамилия *"});
-            const nP=h("input",{cls:"fi",type:"text",placeholder:"Контакты (необязательно)",sty:{marginTop:8}});
-            bookWrap.appendChild(h("div",{cls:"card",sty:{marginBottom:10}},
-              h("div",{sty:{fontWeight:700,marginBottom:8}},"Новый пациент"),nN,nP,
-              h("button",{cls:"btn bs bsm",sty:{marginTop:8},onclick:async()=>{
-                if(!nN.value.trim())return;
-                const np={id:uid(),name:nN.value.trim(),phone:nP.value.trim(),source:"other",birthDate:"",complaint:"",tasks:[],notes:[],createdAt:new Date().toISOString(),status:"new"};
-                // Save immediately and set pending guard
-                S.patients=[...S.patients,np];
-                triggerSave(["patients"]);
-                selPat=np;showNewPat=false;rebBook();
-              }},"Создать и выбрать")
-            ));
-          }
-          // Service selector
-          const svcSel=h("select",{cls:"fi"});
-          svcSel.appendChild(h("option",{value:""},"— Выберите услугу —"));
-          S.services.forEach(sv=>{const o=h("option",{value:sv.id},sv.name+(sv.price?" · "+Number(sv.price).toLocaleString("ru-RU")+" ₽":""));if(selSvc?.id===sv.id)o.selected=true;svcSel.appendChild(o);});
-          svcSel.appendChild(h("option",{value:"__new__"},"+ Создать новую услугу..."));
-          svcSel.onchange=e=>{if(e.target.value==="__new__"){showNewSvc=true;selSvc=null;}else{selSvc=S.services.find(sv=>sv.id===e.target.value)||null;customDur=selSvc?.duration||null;showNewSvc=false;}rebBook();};
-          bookWrap.appendChild(h("div",{cls:"fg"},h("label",{cls:"fl"},"Услуга"),svcSel));
-          // New service mini-form
-          if(showNewSvc){
-            const sN=h("input",{cls:"fi",placeholder:"Название услуги *"});
-            const sP=h("input",{cls:"fi",type:"number",placeholder:"Стоимость, ₽",sty:{marginTop:8}});
-            const sD=h("input",{cls:"fi",type:"number",placeholder:"Длительность, мин",sty:{marginTop:8}});
-            bookWrap.appendChild(h("div",{cls:"card",sty:{marginBottom:10}},
-              h("div",{sty:{fontWeight:700,marginBottom:8}},"Новая услуга"),sN,sP,sD,
-              h("button",{cls:"btn bs bsm",sty:{marginTop:8},onclick:()=>{
-                if(!sN.value.trim())return;
-                const sv={id:uid(),name:sN.value.trim(),price:sP.value||"",duration:parseInt(sD.value)||30};
-                S.services=[...S.services,sv];triggerSave(["services"]);selSvc=sv;customDur=sv.duration;showNewSvc=false;rebBook();
-              }},"Создать услугу")
-            ));
-          }
-          // Duration override
-          if(selSvc){
-            const durI=h("input",{cls:"fi",type:"number",value:String(customDur||selSvc.duration||30)});
-            durI.oninput=e=>customDur=parseInt(e.target.value)||30;
-            bookWrap.appendChild(h("div",{cls:"fg"},h("label",{cls:"fl"},"Длительность (мин)"),durI));
-          }
-          const canBook=!!(selPat&&selSvc&&!showNewPat&&!showNewSvc);
-          // Book button
-          const bookBtn=h("button",{cls:"btn bp bw",onclick:async()=>{
-            const dur=customDur||selSvc.duration||30;
-            const upSlot={...s,available:false,patientId:selPat.id,patientName:selPat.name,serviceId:selSvc.id,serviceName:selSvc.name,serviceDuration:dur};
-            S.patients=S.patients.map(pr=>pr.id!==selPat.id?pr:{...pr,status:pr.status==="new"?"scheduled":pr.status});
-            S.schedule={...S.schedule,[SCR.schDate]:{...S.schedule[SCR.schDate],slots:(S.schedule[SCR.schDate]?.slots||[]).map(sl=>sl.id!==s.id?sl:upSlot)}};
-            triggerSave(["patients","schedule"]);
-            SCR.openSlotId=null;detWrap.innerHTML="";rebSlots();
-          }},canBook?"✓ Записать на приём":"Выберите пациента и услугу");
+        // Build once — no innerHTML replacement, use show/hide to avoid mobile scroll
+        let selPat=null,selSvc=null,customDur=null;
+
+        // Patient select (built once)
+        const patSel=h("select",{cls:"fi"});
+        patSel.appendChild(h("option",{value:""},"— Выберите пациента —"));
+        [...S.patients].sort((a,b)=>a.name.localeCompare(b.name)).forEach(p=>{const o=h("option",{value:p.id},p.name+(p.phone?" · "+p.phone:""));patSel.appendChild(o);});
+        patSel.appendChild(h("option",{value:"__new__"},"+ Создать нового пациента..."));
+        box.appendChild(h("div",{cls:"fg"},h("label",{cls:"fl"},"Пациент"),patSel));
+
+        // New patient form (hidden by default)
+        const nN=h("input",{cls:"fi",placeholder:"Имя и фамилия *"});
+        const nP=h("input",{cls:"fi",type:"text",placeholder:"Контакты (необязательно)",sty:{marginTop:8}});
+        const newPatCard=h("div",{cls:"card",sty:{marginBottom:10,display:"none"}},
+          h("div",{sty:{fontWeight:700,marginBottom:8}},"Новый пациент"),nN,nP,
+          h("button",{cls:"btn bs bsm",sty:{marginTop:8},onclick:async()=>{
+            if(!nN.value.trim())return;
+            const np={id:uid(),name:nN.value.trim(),phone:nP.value.trim(),source:"other",birthDate:"",complaint:"",tasks:[],notes:[],createdAt:new Date().toISOString(),status:"new"};
+            S.patients=[...S.patients,np];triggerSave(["patients"]);
+            selPat=np;
+            // Add to select and choose it
+            const o=h("option",{value:np.id},np.name);patSel.insertBefore(o,patSel.lastElementChild);patSel.value=np.id;
+            newPatCard.style.display="none";updateBookBtn();
+          }},"Создать и выбрать")
+        );
+        box.appendChild(newPatCard);
+
+        // Service select (built once)
+        const svcSel=h("select",{cls:"fi"});
+        svcSel.appendChild(h("option",{value:""},"— Выберите услугу —"));
+        S.services.forEach(sv=>{const o=h("option",{value:sv.id},sv.name+(sv.price?" · "+Number(sv.price).toLocaleString("ru-RU")+" ₽":""));svcSel.appendChild(o);});
+        svcSel.appendChild(h("option",{value:"__new__"},"+ Создать новую услугу..."));
+        box.appendChild(h("div",{cls:"fg"},h("label",{cls:"fl"},"Услуга"),svcSel));
+
+        // New service form (hidden by default)
+        const sN=h("input",{cls:"fi",placeholder:"Название услуги *"});
+        const sP=h("input",{cls:"fi",type:"number",placeholder:"Стоимость, ₽",sty:{marginTop:8}});
+        const sD=h("input",{cls:"fi",type:"number",placeholder:"Длительность, мин",sty:{marginTop:8}});
+        const newSvcCard=h("div",{cls:"card",sty:{marginBottom:10,display:"none"}},
+          h("div",{sty:{fontWeight:700,marginBottom:8}},"Новая услуга"),sN,sP,sD,
+          h("button",{cls:"btn bs bsm",sty:{marginTop:8},onclick:()=>{
+            if(!sN.value.trim())return;
+            const sv={id:uid(),name:sN.value.trim(),price:sP.value||"",duration:parseInt(sD.value)||30};
+            S.services=[...S.services,sv];triggerSave(["services"]);
+            selSvc=sv;customDur=sv.duration;
+            const o=h("option",{value:sv.id},sv.name);svcSel.insertBefore(o,svcSel.lastElementChild);svcSel.value=sv.id;
+            newSvcCard.style.display="none";durWrap.style.display="block";durI.value=String(sv.duration||30);updateBookBtn();
+          }},"Создать услугу")
+        );
+        box.appendChild(newSvcCard);
+
+        // Duration override (shown when service selected)
+        const durI=h("input",{cls:"fi",type:"number",value:"30"});
+        durI.oninput=e=>customDur=parseInt(e.target.value)||30;
+        const durWrap=h("div",{cls:"fg",sty:{display:"none"}},h("label",{cls:"fl"},"Длительность (мин)"),durI);
+        box.appendChild(durWrap);
+
+        // Book button
+        const bookBtn=h("button",{cls:"btn bp bw",sty:{marginBottom:8},disabled:true},"Выберите пациента и услугу");
+        function updateBookBtn(){
+          const canBook=!!(selPat&&selSvc);
           bookBtn.disabled=!canBook;
-          bookWrap.appendChild(h("div",{sty:{marginBottom:8}},bookBtn));
-          bookWrap.appendChild(h("div",{sty:{display:"flex",gap:8}},
-            h("button",{cls:"btn bs",sty:{flex:1},onclick:async()=>{
-              S.schedule={...S.schedule,[SCR.schDate]:{...S.schedule[SCR.schDate],slots:(S.schedule[SCR.schDate]?.slots||[]).map(sl=>sl.id!==s.id?sl:{...sl,available:false})}};
-              triggerSave(["schedule"]);rebSlots();
-            }},"Закрыть слот"),
-            h("button",{cls:"btn bs",onclick:()=>detWrap.innerHTML=""},"✕")
-          ));
+          bookBtn.textContent=canBook?"✓ Записать на приём — "+s.time:"Выберите пациента и услугу";
         }
-        rebBook();
+        bookBtn.onclick=async()=>{
+          if(!selPat||!selSvc)return;
+          const dur=customDur||selSvc.duration||30;
+          const upSlot={...s,available:false,patientId:selPat.id,patientName:selPat.name,serviceId:selSvc.id,serviceName:selSvc.name,serviceDuration:dur};
+          S.patients=S.patients.map(pr=>pr.id!==selPat.id?pr:{...pr,status:pr.status==="new"?"scheduled":pr.status});
+          S.schedule={...S.schedule,[SCR.schDate]:{...S.schedule[SCR.schDate],slots:(S.schedule[SCR.schDate]?.slots||[]).map(sl=>sl.id!==s.id?sl:upSlot)}};
+          triggerSave(["patients","schedule"]);
+          SCR.openSlotId=null;detWrap.innerHTML="";rebSlots();
+        };
+        box.appendChild(bookBtn);
+        box.appendChild(h("div",{sty:{display:"flex",gap:8}},
+          h("button",{cls:"btn bs",sty:{flex:1},onclick:async()=>{
+            S.schedule={...S.schedule,[SCR.schDate]:{...S.schedule[SCR.schDate],slots:(S.schedule[SCR.schDate]?.slots||[]).map(sl=>sl.id!==s.id?sl:{...sl,available:false})}};
+            triggerSave(["schedule"]);SCR.openSlotId=null;rebSlots();
+          }},"Закрыть слот"),
+          h("button",{cls:"btn bs",onclick:()=>{detWrap.innerHTML="";SCR.openSlotId=null;}},"✕")
+        ));
+
+        // Wire up changes (no DOM rebuild — just show/hide)
+        patSel.onchange=e=>{
+          if(e.target.value==="__new__"){
+            newPatCard.style.display="block";selPat=null;
+          } else {
+            newPatCard.style.display="none";
+            selPat=S.patients.find(p=>p.id===e.target.value)||null;
+          }
+          updateBookBtn();
+        };
+        svcSel.onchange=e=>{
+          if(e.target.value==="__new__"){
+            newSvcCard.style.display="block";selSvc=null;durWrap.style.display="none";
+          } else {
+            newSvcCard.style.display="none";
+            selSvc=S.services.find(sv=>sv.id===e.target.value)||null;
+            customDur=selSvc?.duration||null;
+            if(selSvc){durWrap.style.display="block";durI.value=String(selSvc.duration||30);}
+            else durWrap.style.display="none";
+          }
+          updateBookBtn();
+        };
       } else {
         box.appendChild(h("div",{sty:{fontSize:13,color:"var(--mu)",marginBottom:12}},"Слот закрыт"));
         box.appendChild(h("div",{sty:{display:"flex",gap:8}},
@@ -1859,12 +1912,12 @@ function renderWeb(){
 window.addEventListener("focus",()=>{
   if(S.apiUrl&&!S.loading)loadData().then(()=>{
     updateSyncBars();
-    const userIsEditing=!!(SCR.editId||SCR.sub==="pat");
+    const userIsEditing=!!(SCR.editId||SCR.sub==="pat"||SCR.openSlotId);
     if(S.session&&_pendingKeys.size===0&&!userIsEditing)render();
   });
 });
 setInterval(()=>{
-  const userIsEditing=!!(SCR.editId||SCR.sub==="pat");
+  const userIsEditing=!!(SCR.editId||SCR.sub==="pat"||SCR.openSlotId);
   const okToRefresh=_pendingKeys.size===0&&(Date.now()-S._lastSaveMs>10000)&&!userIsEditing;
   if(S.apiUrl&&!S.loading&&S.session&&okToRefresh)
     loadData().then(()=>{updateSyncBars();render();});
