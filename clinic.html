@@ -1635,24 +1635,31 @@ function renderDoctor(){
   const main=h("div",{cls:"dmain"});
   // Live data helpers — called in rebMain and updateDashLive
   function computeLiveData(){
-    const todaySl=(S.schedule[td]?.slots||[]).filter(s=>!s.available&&s.patientId).map(s=>{
-      const pat=S.patients.find(x=>x.id===s.patientId);
-      return {...s,_patStatus:pat?.status};
-    }).filter(s=>!["consulted","operated","followup","completed","cancelled"].includes(s._patStatus));
-    const needC=S.patients.filter(p=>p.nextContact&&p.nextContact<=td);
-    const todayPatIds=new Set((S.schedule[td]?.slots||[]).filter(s=>!s.available&&s.patientId).map(s=>s.patientId));
-    const upOps=S.patients.filter(p=>p.opDate&&p.opDate>=td&&!todayPatIds.has(p.id)).sort((a,b)=>a.opDate.localeCompare(b.opDate));
-    return{todaySl,needC,upOps};
+    // ПРИЁМЫ СЕГОДНЯ: записаны сегодня, приём ещё не состоялся (статус: новый/записан)
+    const todaySl=(S.schedule[td]?.slots||[])
+      .filter(s=>!s.available&&s.patientId)
+      .map(s=>{const pat=S.patients.find(x=>x.id===s.patientId);return{...s,_patStatus:pat?.status};})
+      .filter(s=>["new","scheduled"].includes(s._patStatus));
+
+    // ПРЕДСТОЯЩИЕ ОПЕРАЦИИ: дата операции = сегодня (статус preop)
+    const upOps=S.patients.filter(p=>p.opDate===td&&["preop","scheduled","new"].includes(p.status))
+      .sort((a,b)=>(a.name||"").localeCompare(b.name||""));
+
+    // ОТМЕНЁННЫЕ ПРИЁМЫ: были записаны сегодня, статус отменён
+    const todaySlotPatIds=new Set((S.schedule[td]?.slots||[]).filter(s=>s.patientId).map(s=>s.patientId));
+    const cancelled=S.patients.filter(p=>p.status==="cancelled"&&todaySlotPatIds.has(p.id));
+
+    return{todaySl,upOps,cancelled};
   }
 
   // Targeted dashboard refresh WITHOUT clearing main or scrolling
   function updateDashLive(){
-    const{todaySl,needC,upOps}=computeLiveData();
+    const{todaySl,upOps,cancelled}=computeLiveData();
     // Only update if dashboard is currently shown (no patient open)
     if(SCR.dview==="dashboard"&&!SCR.editId){
       const scrollY=main.scrollTop;
       main.innerHTML="";
-      main.appendChild(docDash(todaySl,needC,upOps,td,rebMain));
+      main.appendChild(docDash(todaySl,upOps,cancelled,td,rebMain));
       main.scrollTop=scrollY;
     }
     // Always update nav badge and sidebar counts
@@ -1662,7 +1669,7 @@ function renderDoctor(){
   }
 
   function rebMain(preserveScroll){
-    const{todaySl,needC,upOps}=computeLiveData();
+    const{todaySl,upOps,cancelled}=computeLiveData();
     sb.querySelectorAll(".si[data-nav]").forEach(b=>{
       b.className="si"+(b.dataset.nav===SCR.dview&&!SCR.editId?" on":"");
     });
@@ -1675,7 +1682,7 @@ function renderDoctor(){
         SCR.editId=null;SCR.patTab=null;SCR._lastPatId=null;rebMain();
       }));
     }
-    else if(SCR.dview==="dashboard")main.appendChild(docDash(todaySl,needC,upOps,td,rebMain));
+    else if(SCR.dview==="dashboard")main.appendChild(docDash(todaySl,upOps,cancelled,td,rebMain));
     else if(SCR.dview==="patients")main.appendChild(docPats(td,rebMain));
     else if(SCR.dview==="schedule")main.appendChild(renderSchedule(S.session.role));
     else if(SCR.dview==="changepw"){
@@ -1705,35 +1712,57 @@ function renderDoctor(){
   rebMain();wrap.appendChild(sb);wrap.appendChild(main);return wrap;
 }
 
-function docDash(todaySl,needC,upOps,td,reb){
+function docDash(todaySl,upOps,cancelled,td,reb){
   const wrap=h("div",{});
   wrap.appendChild(h("h2",{sty:{fontSize:22,fontWeight:800,marginBottom:4}},"Дашборд"));
   wrap.appendChild(h("div",{sty:{fontSize:13,color:"#6B7280",marginBottom:20}},fmtF(td)));
+
+  // Metric cards
   wrap.appendChild(h("div",{cls:"sg"},
     h("div",{cls:"sc"},h("div",{cls:"sn"},S.patients.length),h("div",{cls:"sl"},"Пациентов")),
     h("div",{cls:"sc"},h("div",{cls:"sn"},todaySl.length),h("div",{cls:"sl"},"Сегодня")),
-    h("div",{cls:"sc"},h("div",{cls:"sn",sty:{color:needC.length?"#D97706":"var(--p)"}},needC.length),h("div",{cls:"sl"},"К контакту"))
+    h("div",{cls:"sc"},h("div",{cls:"sn",sty:{color:upOps.length?"#D97706":"var(--p)"}},upOps.length),h("div",{cls:"sl"},"Операции"))
   ));
+
+  // 1. ПРИЁМЫ СЕГОДНЯ
   if(todaySl.length){
-    wrap.appendChild(h("div",{cls:"st"},"Приёмы сегодня"));
+    wrap.appendChild(h("div",{cls:"st"},"📋 Приёмы сегодня"));
     todaySl.forEach(s=>wrap.appendChild(h("div",{cls:"crow",onclick:()=>{SCR.openEdit=true;SCR.editId=s.patientId;reb();}},
       h("div",{sty:{fontWeight:800,fontSize:16,color:"var(--p)",width:44,textAlign:"center",flexShrink:0}},s.time),
-      h("div",{},h("div",{sty:{fontWeight:600}},s.patientName),
-        s.serviceName?h("div",{sty:{fontSize:12,color:"var(--mu)"}},s.serviceName+(s.clinic?" · "+s.clinic:"")):null)
+      h("div",{},
+        h("div",{sty:{fontWeight:600}},s.patientName),
+        s.serviceName?h("div",{sty:{fontSize:12,color:"var(--mu)"}},s.serviceName+(s.clinic?" · "+s.clinic:"")):null
+      )
     )));
+  } else {
+    wrap.appendChild(h("div",{cls:"st"},"📋 Приёмы сегодня"));
+    wrap.appendChild(h("div",{sty:{fontSize:13,color:"var(--mu)",padding:"8px 0 4px"}},"Нет записей на сегодня"));
   }
-  if(needC.length){
-    wrap.appendChild(h("div",{cls:"st",sty:{color:"#D97706"}},"⚠️ Требуют контакта"));
-    needC.forEach(p=>wrap.appendChild(h("div",{cls:"card",sty:{borderLeft:"3px solid #D97706",cursor:"pointer",padding:"10px 14px"},onclick:()=>{SCR.openEdit=true;SCR.editId=p.id;reb();}},
-      h("div",{sty:{fontWeight:600}},p.name),h("div",{sty:{fontSize:12,color:"var(--mu)"}},"📋 "+p.phone+" · "+fmtD(p.nextContact))
-    )));
-  }
+
+  // 2. ПРЕДСТОЯЩИЕ ОПЕРАЦИИ (сегодня)
+  wrap.appendChild(h("div",{cls:"st",sty:{marginTop:4}},"🔪 Операции сегодня"));
   if(upOps.length){
-    wrap.appendChild(h("div",{cls:"st"},"Предстоящие операции"));
-    upOps.slice(0,6).forEach(p=>wrap.appendChild(h("div",{cls:"crow",onclick:()=>{SCR.openEdit=true;SCR.editId=p.id;reb();}},
-      h("div",{},h("div",{sty:{fontWeight:600}},p.name),h("div",{sty:{fontSize:12,color:"var(--mu)"}},"🗓 "+(p.opDate?fmtD(p.opDate):p.opDateText||"—")+(p.opPrice?" · "+fmtPrice(p.opPrice,""):"")))
+    upOps.forEach(p=>wrap.appendChild(h("div",{cls:"crow",onclick:()=>{SCR.openEdit=true;SCR.editId=p.id;reb();}},
+      h("div",{},
+        h("div",{sty:{fontWeight:600}},p.name),
+        h("div",{sty:{fontSize:12,color:"var(--mu)"}},"🗓 "+fmtD(p.opDate)+(p.opPrice?" · "+fmtPrice(p.opPrice,""):""))
+      )
+    )));
+  } else {
+    wrap.appendChild(h("div",{sty:{fontSize:13,color:"var(--mu)",padding:"8px 0 4px"}},"Нет операций на сегодня"));
+  }
+
+  // 3. ОТМЕНЁННЫЕ ПРИЁМЫ
+  if(cancelled.length){
+    wrap.appendChild(h("div",{cls:"st",sty:{marginTop:4,color:"var(--r)"}},"❌ Отменённые приёмы"));
+    cancelled.forEach(p=>wrap.appendChild(h("div",{cls:"crow",sty:{borderLeft:"3px solid var(--r)"},onclick:()=>{SCR.openEdit=true;SCR.editId=p.id;reb();}},
+      h("div",{},
+        h("div",{sty:{fontWeight:600}},p.name),
+        h("div",{sty:{fontSize:12,color:"var(--mu)"}},(p.phone?"📋 "+p.phone:" ")+" · Отменён")
+      )
     )));
   }
+
   if(!S.patients.length)wrap.appendChild(h("div",{cls:"emp"},h("div",{cls:"empi"},"📋"),h("div",{},"Пациентов пока нет")));
   return wrap;
 }
