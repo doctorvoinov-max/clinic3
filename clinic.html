@@ -2028,7 +2028,12 @@ function renderPatsTab(td,city){
 }
 
 function taskRowSimple(t,urg,fut){
-  const el=h("div",{cls:"task-item",sty:urg?{borderLeft:"3px solid var(--r)"}:{}});
+  const pat=S.patients.find(x=>x.id===t.pId);
+  const isOperated=["operated","followup"].includes(pat?.status);
+  const patSt=ST[pat?.status];
+  // Border: red for overdue, green for operated, default otherwise
+  const borderColor=urg?"var(--r)":isOperated?"#059669":"transparent";
+  const el=h("div",{cls:"task-item",sty:{borderLeft:"3px solid "+borderColor}});
   const chk=h("button",{cls:"task-done-btn",onclick:async e=>{
     e.stopPropagation();
     await savePats(S.patients.map(p=>p.id!==t.pId?p:{...p,tasks:(p.tasks||[]).map(tk=>tk.id!==t.id?tk:{...tk,completed:true,completedAt:new Date().toISOString()})}),true);
@@ -2036,9 +2041,15 @@ function taskRowSimple(t,urg,fut){
   }},"✓");
   const hdr=h("div",{cls:"task-hdr",onclick:()=>{SCR.openTaskId=t.id;SCR.sub="pat";SCR.editId=t.pId;render();}},
     h("div",{sty:{flex:1}},
-      h("div",{sty:{fontWeight:700,fontSize:14}},t.pName),
+      h("div",{sty:{display:"flex",alignItems:"center",gap:6,flexWrap:"wrap"}},
+        h("span",{sty:{fontWeight:700,fontSize:14}},t.pName),
+        isOperated?h("span",{cls:"tag",sty:{background:"#E8F5F2",color:"#059669",fontSize:10}},"🔪 "+patSt?.l):null
+      ),
       t.pPhone?h("div",{sty:{fontSize:12,color:"var(--mu)"}},t.pPhone):null,
-      h("span",{cls:"tag",sty:{background:"var(--pll)",color:"var(--p)"}},CT[t.type]||t.type),
+      h("div",{sty:{display:"flex",gap:6,flexWrap:"wrap",marginTop:3}},
+        h("span",{cls:"tag",sty:{background:"var(--pll)",color:"var(--p)"}},CT[t.type]||t.type),
+        t.description?h("span",{sty:{fontSize:11,color:"var(--tx)"}},t.description):null
+      ),
       t.dueDate!==today()?h("div",{sty:{fontSize:11,color:fut?"var(--mu)":"var(--r)",marginTop:3}},"📅 "+fmtD(t.dueDate)):null
     ),chk
   );
