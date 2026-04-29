@@ -264,16 +264,42 @@ function slotMatchesCity(slot,city){
   return clinics.some(cl=>slot.clinic&&slot.clinic.includes(cl.split(" ")[0]));
 }
 function patMatchesCity(pat,city){
-  if(city==="all")return true;
-  // Patient matches city if any of their slots are in that city's clinics
-  return Object.values(S.schedule).some(day=>
-    (day.slots||[]).some(s=>s.patientId===pat.id&&slotMatchesCity(s,city))
-  );
+  if(!pat||city==="all")return true;
+  const clinics=CITIES[city]?.clinics||[];
+  // Check all schedule slots for this patient
+  let found=false;
+  Object.values(S.schedule).forEach(day=>{
+    (day.slots||[]).forEach(s=>{
+      if(s.patientId===pat.id&&clinics.some(cl=>(s.clinic||"").includes(cl.split(" ")[0])))found=true;
+    });
+  });
+  return found;
+}
+// Get city label for a patient (for display)
+function patCity(pat){
+  for(const [cityKey,cityData] of Object.entries(CITIES)){
+    if(patMatchesCity(pat,cityKey))return cityKey;
+  }
+  return null;
+}
+// Filter patients by city
+function filterPatsByCity(pats,city){
+  if(city==="all")return pats;
+  return pats.filter(p=>patMatchesCity(p,city));
+}
+// Filter tasks by city (task belongs to city if its patient belongs to city)
+function filterTasksByCity(tasks,city){
+  if(city==="all")return tasks;
+  return tasks.filter(t=>{
+    const pat=S.patients.find(x=>x.id===t.pId);
+    return patMatchesCity(pat,city);
+  });
 }
 function mkCityPicker(){
   const cur=getCityFilter();
-  const wrap=h("div",{sty:{display:"flex",gap:4,padding:"6px 8px"}});
-  [{k:"all",l:"Все"},{k:"moscow",l:"Москва"},{k:"tashkent",l:"Ташкент"}].forEach(({k,l})=>{
+  const wrap=h("div",{sty:{display:"flex",gap:4,padding:"8px 16px",background:"#fff",borderBottom:"1px solid var(--bd)"}});
+  wrap.appendChild(h("span",{sty:{fontSize:12,color:"var(--mu)",alignSelf:"center",marginRight:4}},"Город:"));
+  [{k:"all",l:"Все"},{k:"moscow",l:"🏙 Москва"},{k:"tashkent",l:"🌏 Ташкент"}].forEach(({k,l})=>{
     const btn=h("button",{cls:"btn bsm "+(cur===k?"bp":"bs"),onclick:()=>{SCR.city=k;render();}},l);
     wrap.appendChild(btn);
   });
@@ -1671,7 +1697,13 @@ function renderDoctor(){
     const prvWrap=h("div",{sty:{position:"relative"}},prvBtn,prvMenu);
     footer.appendChild(prvWrap);
   }
-  footer.appendChild(h("button",{cls:"si",title:"Фильтр по городу",onclick:()=>{const c=getCityFilter();SCR.city=c==="all"?"moscow":c==="moscow"?"tashkent":"all";rebMain();}},h("span",{sty:{fontSize:18}},"🌐"),h("span",{cls:"si-lbl"},getCityFilter()==="all"?"Все города":getCityFilter()==="moscow"?"Москва":"Ташкент")));
+  // City selector: proper buttons in sidebar
+  const cityWrap=h("div",{sty:{borderTop:"1px solid var(--bd)",paddingTop:8,marginBottom:4}});
+  [{k:"all",l:"🌐",label:"Все"},{k:"moscow",l:"🏙",label:"Москва"},{k:"tashkent",l:"🌏",label:"Ташкент"}].forEach(({k,l,label})=>{
+    cityWrap.appendChild(h("button",{cls:"si"+(getCityFilter()===k?" on":""),onclick:()=>{SCR.city=k;rebMain();}},
+      h("span",{sty:{fontSize:18}},l),h("span",{cls:"si-lbl"},label)));
+  });
+  sb.appendChild(cityWrap);
   footer.appendChild(mkSyncBar(true));
   footer.appendChild(h("button",{cls:"si",title:"Сменить пароль",onclick:()=>{
     const u=S.users.find(x=>x.id===S.session?.userId);
@@ -1689,14 +1721,15 @@ function renderDoctor(){
       .filter(s=>!s.available&&s.patientId&&(_cityF==="all"||slotMatchesCity(s,_cityF)))
       .map(s=>{const pat=S.patients.find(x=>x.id===s.patientId);return{...s,_patStatus:pat?.status};})
       .filter(s=>["new","scheduled"].includes(s._patStatus));
+    // Re-compute cancelled for city
+    const todaySlotPatIds2=new Set((S.schedule[td]?.slots||[]).filter(s=>s.patientId&&(_cityF==="all"||slotMatchesCity(s,_cityF))).map(s=>s.patientId));
 
     // ПРЕДСТОЯЩИЕ ОПЕРАЦИИ: дата операции = сегодня (статус preop)
     const upOps=S.patients.filter(p=>p.opDate===td&&["preop","scheduled","new"].includes(p.status)&&(_cityF==="all"||patMatchesCity(p,_cityF)))
       .sort((a,b)=>(a.name||"").localeCompare(b.name||""));
 
     // ОТМЕНЁННЫЕ ПРИЁМЫ: были записаны сегодня, статус отменён
-    const todaySlotPatIds=new Set((S.schedule[td]?.slots||[]).filter(s=>s.patientId).map(s=>s.patientId));
-    const cancelled=S.patients.filter(p=>p.status==="cancelled"&&todaySlotPatIds.has(p.id));
+    const cancelled=filterPatsByCity(S.patients,_cityF).filter(p=>p.status==="cancelled"&&todaySlotPatIds2.has(p.id));
 
     return{todaySl,upOps,cancelled};
   }
@@ -1830,7 +1863,10 @@ function docPats(td,reb){
   }
   function bld(q){
     inner.innerHTML="";
-    const fl=(q?S.patients.filter(p=>p.name.toLowerCase().includes(q.toLowerCase())||(p.phone||"").includes(q)):[...S.patients]).sort((a,b)=>b.createdAt.localeCompare(a.createdAt));
+    const city=getCityFilter();
+    function firstSlot(patId){let e=null;Object.entries(S.schedule).forEach(([d,day])=>{if((day.slots||[]).some(s=>s.patientId===patId)){if(!e||d<e)e=d;}});return e;}
+    const base=filterPatsByCity(q?S.patients.filter(p=>p.name.toLowerCase().includes(q.toLowerCase())||(p.phone||"").includes(q)):[...S.patients],city);
+    const fl=base.map(p=>({...p,_fs:firstSlot(p.id)||p.createdAt.slice(0,10)})).sort((a,b)=>b._fs.localeCompare(a._fs));
     if(!fl.length){inner.appendChild(h("div",{cls:"emp"},h("div",{cls:"empi"},"👥"),h("div",{},"Нет пациентов")));return;}
     const tbl=h("table",{cls:"tbl"});
     tbl.appendChild(h("thead",{},h("tr",{},h("th",{},"Пациент"),h("th",{},"Статус"),h("th",{},"Операция"),h("th",{},"Цена"),h("th",{},"Контакт"))));
@@ -1876,12 +1912,23 @@ function renderAddPatForm(role,onBack){
 function renderAssistant(){
   const td=today();
 
-  // Compute all active tasks
+  const city=getCityFilter();
+  // Only tasks assigned by doctor (types: callback, confirm, postop — or has description)
+  const DOCTOR_TASK_TYPES=new Set(["callback","confirm","postop","schedule","review"]);
   const allT=[];
-  S.patients.forEach(p=>(p.tasks||[]).forEach(t=>{if(!t.completed)allT.push({...t,pId:p.id,pName:p.name,pPhone:p.phone});}));
-  allT.sort((a,b)=>a.dueDate.localeCompare(b.dueDate));
-  const ov=allT.filter(t=>t.dueDate<td),tT=allT.filter(t=>t.dueDate===td),lT=allT.filter(t=>t.dueDate>td);
-  const needC=S.patients.filter(p=>p.nextContact&&p.nextContact<=td&&!["completed","cancelled","operated","followup","consulted"].includes(p.status));
+  S.patients.forEach(p=>(p.tasks||[]).forEach(t=>{
+    if(!t.completed&&DOCTOR_TASK_TYPES.has(t.type))
+      allT.push({...t,pId:p.id,pName:p.name,pPhone:p.phone});
+  }));
+  // Filter by city
+  const cityT=filterTasksByCity(allT,city);
+  cityT.sort((a,b)=>a.dueDate.localeCompare(b.dueDate));
+  const ov=cityT.filter(t=>t.dueDate<td),tT=cityT.filter(t=>t.dueDate===td),lT=cityT.filter(t=>t.dueDate>td);
+  // needC: patients in this city with pending contact date and active status
+  const needC=filterPatsByCity(S.patients,city).filter(p=>
+    p.nextContact&&p.nextContact<=td&&
+    !["completed","cancelled","operated","followup","consulted"].includes(p.status)
+  );
   const pend=ov.length+tT.length+needC.length;
 
   const wrap=h("div",{sty:{display:"flex",flexDirection:"column",minHeight:"100vh",background:"var(--bg)"}});
@@ -1909,8 +1956,8 @@ function renderAssistant(){
       render();
     });
   }
-  else if(SCR.tab==="today")content=renderToday(ov,tT,lT,needC,td);
-  else if(SCR.tab==="pats")content=renderPatsTab(td);
+  else if(SCR.tab==="today")content=renderToday(ov,tT,lT,needC,td,city);
+  else if(SCR.tab==="pats")content=renderPatsTab(td,city);
   else content=renderSchedule("assistant");
 
   const nav=h("nav",{cls:"bn"},
@@ -1929,7 +1976,7 @@ function renderAssistant(){
   els.forEach(e=>wrap.appendChild(e));return wrap;
 }
 
-function renderPatsTab(td){
+function renderPatsTab(td,city){
   const wrap=h("div",{});
   wrap.appendChild(h("div",{sty:{display:"flex",alignItems:"center",justifyContent:"space-between",marginBottom:14}},
     h("div",{sty:{fontSize:18,fontWeight:800}},"Пациенты"),
@@ -1942,7 +1989,7 @@ function renderPatsTab(td){
     SCR._patSearch=q;
     lst.innerHTML="";
     if(q){
-      const fl=S.patients.filter(p=>p.name.toLowerCase().includes(q.toLowerCase())||(p.phone||"").includes(q)).sort((a,b)=>a.name.localeCompare(b.name));
+      const fl=filterPatsByCity(S.patients,city||"all").filter(p=>p.name.toLowerCase().includes(q.toLowerCase())||(p.phone||"").includes(q)).sort((a,b)=>a.name.localeCompare(b.name));
       if(!fl.length){lst.appendChild(h("div",{cls:"emp"},h("div",{},"Не найдено")));return;}
       fl.forEach(p=>lst.appendChild(patCard(p,()=>{SCR.sub="pat";SCR.editId=p.id;render();})));
       return;
@@ -1952,8 +1999,9 @@ function renderPatsTab(td){
       Object.entries(S.schedule).forEach(([d,day])=>{if((day.slots||[]).some(s=>s.patientId===patId)){if(!earliest||d<earliest)earliest=d;}});
       return earliest;
     }
+    const allPats=filterPatsByCity(S.patients,city||"all");
     const active=[],neverCame=[];
-    S.patients.forEach(p=>{
+    allPats.forEach(p=>{
       const fs=firstSlotDate(p.id);
       const hasVisited=["consulted","operated","followup","completed","preop"].includes(p.status);
       if(p.status==="cancelled"&&!hasVisited)neverCame.push({...p,_firstSlot:fs});
@@ -1996,7 +2044,7 @@ function taskRowSimple(t,urg,fut){
   );
   el.appendChild(hdr);return el;
 }
-function renderToday(ov,tT,lT,needC,td){
+function renderToday(ov,tT,lT,needC,td,city){
   const f=document.createDocumentFragment();
 
   // Header with date
@@ -2004,7 +2052,7 @@ function renderToday(ov,tT,lT,needC,td){
   f.appendChild(h("div",{sty:{fontSize:13,color:"var(--mu)",marginBottom:14}},new Date().toLocaleDateString("ru-RU",{weekday:"long",day:"numeric",month:"long"})));
 
   // Slots today from schedule — who is coming
-  const city=getCityFilter();const todaySlots=(S.schedule[td]?.slots||[]).filter(s=>!s.available&&s.patientId&&(city==="all"||slotMatchesCity(s,city)));
+  const todaySlots=(S.schedule[td]?.slots||[]).filter(s=>!s.available&&s.patientId&&(city==="all"||slotMatchesCity(s,city)));
   if(todaySlots.length){
     f.appendChild(h("div",{cls:"st"},"📅 Записаны сегодня — "+todaySlots.length));
     todaySlots.sort((a,b)=>a.time.localeCompare(b.time)).forEach(s=>{
