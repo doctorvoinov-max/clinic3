@@ -105,7 +105,7 @@ textarea.fi{min-height:72px;resize:vertical;font-size:14px}
 .modal{background:#fff;border-radius:20px 20px 0 0;padding:20px 18px 36px;width:100%;max-width:620px;max-height:90vh;overflow-y:auto}
 .badge{display:inline-block;padding:1px 7px;border-radius:12px;font-size:10px;font-weight:700;margin-left:6px}
 .syncbar-warn{color:var(--a)!important}.loader{min-height:100vh;display:flex;align-items:center;justify-content:center;font-size:18px;color:var(--mu)}
-@media(max-width:600px){.tbl th:nth-child(4),.tbl td:nth-child(4),.tbl th:nth-child(5),.tbl td:nth-child(5){display:none}.datefield{grid-template-columns:1fr}}
+@media(max-width:600px){.tbl th:nth-child(4),.tbl td:nth-child(4),.tbl th:nth-child(5),.tbl td:nth-child(5),.tbl th:nth-child(6),.tbl td:nth-child(6){display:none}.datefield{grid-template-columns:1fr}}
 </style>
 </head>
 <body>
@@ -1858,21 +1858,111 @@ function docPats(td,reb){
   const tW=h("div",{cls:"card",sty:{padding:0,overflow:"hidden"}});
   const inner=h("div",{sty:{overflowX:"auto"}});
   if(SCR.editId==="__new__"){
-    // Add patient form inline
     return renderAddPatForm(S.session.role,()=>{SCR.editId=null;reb();});
   }
+
+  // Sort/filter state persists across re-renders of this tab (reset when leaving it)
+  if(!SCR.patSort)SCR.patSort={col:"_fs",dir:"desc"};
+  if(!SCR.patFilter)SCR.patFilter={};
+
+  const PAT_COLS=[
+    {key:"name",label:"Пациент",filterable:false},
+    {key:"_fs",label:"Дата записи",filterable:true},
+    {key:"status",label:"Статус",filterable:true},
+    {key:"opDate",label:"Операция",filterable:false},
+    {key:"opPrice",label:"Цена",filterable:true},
+    {key:"nextContact",label:"Контакт",filterable:false}
+  ];
+  function rawVal(p,col){return col==="opPrice"?(Number(p.opPrice)||0):(p[col]||"");}
+  function filterLabel(col,v){
+    if(col==="status")return ST[v]?.l||v||"—";
+    if(col==="_fs")return v?fmtD(v):"—";
+    if(col==="opPrice")return v?fmtPrice(v,""):"—";
+    return v||"—";
+  }
+
+  // Filter dropdown lives in `wrap` (not document.body) positioned fixed, so it's
+  // automatically cleaned up when this view is torn down, but still floats above
+  // the table regardless of the scroll/overflow containers around it.
+  let activeFilterPanel=null;
+  function closeFilterPanel(){
+    if(activeFilterPanel){activeFilterPanel._closeHandler&&document.removeEventListener("mousedown",activeFilterPanel._closeHandler);activeFilterPanel.remove();activeFilterPanel=null;}
+  }
+  function openFilterPanel(col,btnEl,allValues){
+    closeFilterPanel();
+    const rect=btnEl.getBoundingClientRect();
+    const selected=new Set(SCR.patFilter[col]||[]);
+    const panel=h("div",{cls:"card",sty:{position:"fixed",top:(rect.bottom+4)+"px",left:Math.min(rect.left,window.innerWidth-200)+"px",zIndex:999,minWidth:170,maxHeight:280,overflowY:"auto",boxShadow:"0 8px 24px rgba(0,0,0,.18)"}});
+    panel.appendChild(h("div",{sty:{display:"flex",justifyContent:"space-between",marginBottom:8,fontSize:11}},
+      h("span",{sty:{cursor:"pointer",color:"var(--p)",fontWeight:700},onclick:()=>{SCR.patFilter[col]=[];closeFilterPanel();bld(inp.value);}},"Сбросить"),
+      h("span",{sty:{cursor:"pointer",color:"var(--mu)",fontWeight:700},onclick:()=>closeFilterPanel()},"✕")
+    ));
+    allValues.forEach(v=>{
+      const cb=h("input",{type:"checkbox",sty:{marginRight:6}});
+      cb.checked=selected.has(v);
+      cb.onchange=()=>{
+        const cur=new Set(SCR.patFilter[col]||[]);
+        if(cb.checked)cur.add(v);else cur.delete(v);
+        SCR.patFilter[col]=[...cur];
+        bld(inp.value);
+      };
+      panel.appendChild(h("label",{sty:{display:"flex",alignItems:"center",fontSize:12,padding:"4px 2px",cursor:"pointer",whiteSpace:"nowrap"}},cb,filterLabel(col,v)));
+    });
+    wrap.appendChild(panel);
+    activeFilterPanel=panel;
+    const closeHandler=(ev)=>{if(!panel.contains(ev.target)&&ev.target!==btnEl){closeFilterPanel();}};
+    panel._closeHandler=closeHandler;
+    setTimeout(()=>document.addEventListener("mousedown",closeHandler),0);
+  }
+
   function bld(q){
     inner.innerHTML="";
     const city=getCityFilter();
     function firstSlot(patId){let e=null;Object.entries(S.schedule).forEach(([d,day])=>{if((day.slots||[]).some(s=>s.patientId===patId)){if(!e||d<e)e=d;}});return e;}
     const base=filterPatsByCity(q?S.patients.filter(p=>p.name.toLowerCase().includes(q.toLowerCase())||(p.phone||"").includes(q)):[...S.patients],city);
-    const fl=base.map(p=>({...p,_fs:firstSlot(p.id)||p.createdAt.slice(0,10)})).sort((a,b)=>b._fs.localeCompare(a._fs));
+    const withFs=base.map(p=>({...p,_fs:firstSlot(p.id)||p.createdAt.slice(0,10)}));
+
+    const filtered=withFs.filter(p=>Object.entries(SCR.patFilter).every(([col,allowed])=>!allowed||!allowed.length||allowed.includes(rawVal(p,col))));
+
+    const{col:sortCol,dir}=SCR.patSort;
+    const mul=dir==="asc"?1:-1;
+    const fl=[...filtered].sort((a,b)=>{
+      const av=rawVal(a,sortCol),bv=rawVal(b,sortCol);
+      if(typeof av==="number"||typeof bv==="number")return mul*((Number(av)||0)-(Number(bv)||0));
+      return mul*String(av).localeCompare(String(bv));
+    });
+
     if(!fl.length){inner.appendChild(h("div",{cls:"emp"},h("div",{cls:"empi"},"👥"),h("div",{},"Нет пациентов")));return;}
+
     const tbl=h("table",{cls:"tbl"});
-    tbl.appendChild(h("thead",{},h("tr",{},h("th",{},"Пациент"),h("th",{},"Статус"),h("th",{},"Операция"),h("th",{},"Цена"),h("th",{},"Контакт"))));
+    const headRow=h("tr",{});
+    PAT_COLS.forEach(c=>{
+      const isSorted=SCR.patSort.col===c.key;
+      const arrow=isSorted?(SCR.patSort.dir==="asc"?" ↑":" ↓"):"";
+      const labelSpan=h("span",{sty:{cursor:"pointer",userSelect:"none"},onclick:()=>{
+        closeFilterPanel();
+        if(SCR.patSort.col===c.key)SCR.patSort.dir=SCR.patSort.dir==="asc"?"desc":"asc";
+        else SCR.patSort={col:c.key,dir:"asc"};
+        bld(inp.value);
+      }},c.label+arrow);
+      const thChildren=[labelSpan];
+      if(c.filterable){
+        const activeCount=(SCR.patFilter[c.key]||[]).length;
+        const filterBtn=h("button",{type:"button",sty:{border:"none",background:"none",cursor:"pointer",padding:"0 0 0 6px",fontSize:11,color:activeCount?"var(--p)":"var(--hi)",fontWeight:activeCount?700:400}},activeCount?"▼"+activeCount:"▼");
+        filterBtn.onclick=(e)=>{
+          e.stopPropagation();
+          const uniques=[...new Set(withFs.map(p=>rawVal(p,c.key)))].sort((x,y)=>typeof x==="number"?x-y:String(x).localeCompare(String(y)));
+          openFilterPanel(c.key,filterBtn,uniques);
+        };
+        thChildren.push(filterBtn);
+      }
+      headRow.appendChild(h("th",{sty:{whiteSpace:"nowrap"}},...thChildren));
+    });
+    tbl.appendChild(h("thead",{},headRow));
     const tb=h("tbody",{});
     fl.forEach(p=>{const s=ST[p.status];tb.appendChild(h("tr",{onclick:()=>{SCR.openEdit=true;SCR.editId=p.id;reb();}},
       h("td",{},h("div",{sty:{fontWeight:600}},p.name),h("div",{sty:{fontSize:11,color:"#6B7280"}},(p.phone||"")+(p.birthDate?" · "+ageLabel(p.birthDate):""))),
+      h("td",{},fmtD(p._fs)),
       h("td",{},h("span",{cls:"tag",sty:{background:(s?.c||"#ccc")+"22",color:s?.c}},s?.l)),
       h("td",{},p.opDate?fmtD(p.opDate):(p.opDateText||"—")),
       h("td",{},p.opPrice?fmtPrice(p.opPrice,""):"—"),
@@ -1880,7 +1970,7 @@ function docPats(td,reb){
     ));});
     tbl.appendChild(tb);inner.appendChild(tbl);
   }
-  inp.addEventListener("input",e=>bld(e.target.value));bld("");
+  inp.addEventListener("input",e=>{closeFilterPanel();bld(e.target.value);});bld("");
   tW.appendChild(inner);wrap.appendChild(inp);wrap.appendChild(tW);return wrap;
 }
 
