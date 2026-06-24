@@ -1715,12 +1715,12 @@ function renderDoctor(){
   const main=h("div",{cls:"dmain"});
   // Live data helpers — called in rebMain and updateDashLive
   function computeLiveData(){
-    // ПРИЁМЫ СЕГОДНЯ: записаны сегодня, приём ещё не состоялся (статус: новый/записан)
+    // ПРИЁМЫ СЕГОДНЯ: записаны сегодня, приём ещё не состоялся (исключаем уже принятых/прооперированных/наблюдение/завершён/отменён)
     const _cityF=getCityFilter();
     const todaySl=(S.schedule[td]?.slots||[])
       .filter(s=>!s.available&&s.patientId&&(_cityF==="all"||slotMatchesCity(s,_cityF)))
       .map(s=>{const pat=S.patients.find(x=>x.id===s.patientId);return{...s,_patStatus:pat?.status};})
-      .filter(s=>["new","scheduled"].includes(s._patStatus));
+      .filter(s=>!["consulted","operated","followup","completed","cancelled"].includes(s._patStatus));
     // Re-compute cancelled for city
     const todaySlotPatIds2=new Set((S.schedule[td]?.slots||[]).filter(s=>s.patientId&&(_cityF==="all"||slotMatchesCity(s,_cityF))).map(s=>s.patientId));
 
