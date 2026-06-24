@@ -1719,8 +1719,8 @@ function renderDoctor(){
     const _cityF=getCityFilter();
     const todaySl=(S.schedule[td]?.slots||[])
       .filter(s=>!s.available&&s.patientId&&(_cityF==="all"||slotMatchesCity(s,_cityF)))
-      .map(s=>{const pat=S.patients.find(x=>x.id===s.patientId);return{...s,_patStatus:pat?.status};})
-      .filter(s=>!["consulted","operated","followup","completed","cancelled"].includes(s._patStatus));
+      .map(s=>{const pat=S.patients.find(x=>x.id===s.patientId);return{...s,_patStatus:pat?.status,_patExists:!!pat};})
+      .filter(s=>s._patExists&&!["consulted","operated","followup","completed","cancelled"].includes(s._patStatus));
     // Re-compute cancelled for city
     const todaySlotPatIds2=new Set((S.schedule[td]?.slots||[]).filter(s=>s.patientId&&(_cityF==="all"||slotMatchesCity(s,_cityF))).map(s=>s.patientId));
 
