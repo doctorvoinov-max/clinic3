@@ -46,9 +46,10 @@ textarea.fi{min-height:72px;resize:vertical;font-size:14px}
 .slt.fr{background:var(--pll);color:var(--p)}
 .slt.bk-new{background:#EEF2FF;color:#4F46E5}
 .slt.bk-repeat{background:#FEF3E2;color:#C9720A}
-.slt.bk-done{background:#E8F5F2;color:#059669}
+.slt.bk-done{background:#F3E8FF;color:#7C3AED}
 .slt.bk{background:#EEF2FF;color:#4F46E5}
 .slt.cls{background:#F3F4F6;color:var(--hi);cursor:default}
+.slt-dot{display:inline-block;width:6px;height:6px;border-radius:50%;background:#D97706;margin-left:4px;vertical-align:middle}
 .slt-name{font-size:9px;font-weight:500;margin-top:2px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;max-width:74px}
 .dr{display:flex;gap:6px;overflow-x:auto;padding-bottom:4px;margin-bottom:14px;scrollbar-width:none;-webkit-overflow-scrolling:touch}
 .dr::-webkit-scrollbar{display:none}
@@ -1087,12 +1088,14 @@ function renderSchedule(role){
       h("span",{cls:"slt fr bsm",sty:{padding:"2px 8px",fontSize:10,cursor:"default"}},"Свободен"),
       h("span",{cls:"slt bk-new bsm",sty:{padding:"2px 8px",fontSize:10,cursor:"default"}},"Первичный"),
       h("span",{cls:"slt bk-repeat bsm",sty:{padding:"2px 8px",fontSize:10,cursor:"default"}},"Повторный"),
-      h("span",{cls:"slt bk-done bsm",sty:{padding:"2px 8px",fontSize:10,cursor:"default"}},"Принят ✓")
+      h("span",{cls:"slt bk-done bsm",sty:{padding:"2px 8px",fontSize:10,cursor:"default"}},"Принят ✓"),
+      h("span",{sty:{fontSize:10,color:"var(--mu)",display:"flex",alignItems:"center"}},h("span",{cls:"slt-dot",sty:{marginRight:4}}),"= нужен контакт")
     ));
     if(!slots.length){slWrap.appendChild(h("div",{sty:{fontSize:13,color:"var(--mu)",padding:"10px 0"}},"Нет слотов. Добавьте блок работы."));}
     const grid=h("div",{sty:{display:"flex",flexWrap:"wrap"}});
     slots.forEach(s=>{
       let cls;
+      let needsContact=false;
       if(s.available){
         cls="fr";
       } else if(!s.patientId){
@@ -1105,9 +1108,10 @@ function renderSchedule(role){
         else if(st==="preop")cls="bk-repeat";
         else if(pat?.source==="repeat")cls="bk-repeat";
         else cls="bk-new";
+        needsContact=!!(pat?.nextContact&&pat.nextContact<=today());
       }
       const el=h("div",{cls:"slt "+cls},
-        s.time,
+        s.time,needsContact?h("span",{cls:"slt-dot",title:"Подошёл срок контакта"}):null,
         s.clinic&&!s.patientId?h("div",{cls:"slt-name"},s.clinic):null,
         s.patientId?h("div",{cls:"slt-name"},s.patientName?.split(" ")[0]+(s.serviceName?" · "+s.serviceName.substring(0,8):"")):"  "
       );
@@ -1132,7 +1136,49 @@ function renderSchedule(role){
           s.serviceName?h("div",{sty:{fontSize:13,color:"var(--mu)"}},s.serviceName+(s.serviceDuration?" · "+s.serviceDuration+" мин":"")):null,
           s.clinic?h("div",{sty:{fontSize:12,color:"var(--mu)"}},"📍 "+s.clinic):null
         ));
-        box.appendChild(h("div",{sty:{display:"flex",gap:8}},
+        const rfWrap=h("div",{sty:{display:"none",marginBottom:10}});
+        let showRf=false;
+        const rfErr=h("div",{sty:{fontSize:12,color:"var(--r)",marginBottom:6,display:"none"}});
+        const rfDate=h("input",{cls:"fi",type:"date",value:SCR.schDate});
+        const rfTime=h("input",{cls:"fi",type:"time",value:s.time});
+        rfWrap.appendChild(h("div",{sty:{display:"flex",gap:8,marginBottom:8}},
+          h("div",{sty:{flex:1}},h("label",{cls:"fl"},"Новая дата"),rfDate),
+          h("div",{sty:{flex:1}},h("label",{cls:"fl"},"Новое время"),rfTime)
+        ));
+        rfWrap.appendChild(rfErr);
+        rfWrap.appendChild(h("div",{sty:{display:"flex",gap:8}},
+          h("button",{cls:"btn bp bsm",onclick:async()=>{
+            const toDate=rfDate.value,toTime=rfTime.value;
+            if(!toDate||!toTime)return;
+            const fromDate=SCR.schDate,isSameDay=fromDate===toDate;
+            const freedSlot={...s,available:true,patientId:null,patientName:null,serviceId:null,serviceName:null};
+            const targetBase=isSameDay?(S.schedule[fromDate]?.slots||[]).map(sl=>sl.id===s.id?freedSlot:sl):(S.schedule[toDate]?.slots||[]);
+            const existingAtTime=targetBase.find(sl=>sl.time===toTime);
+            if(existingAtTime&&!existingAtTime.available){rfErr.textContent="⚠️ На это время уже есть запись. Выберите другое время.";rfErr.style.display="block";return;}
+            let newTargetSlots;
+            if(existingAtTime){
+              newTargetSlots=targetBase.map(sl=>sl.id===existingAtTime.id?{...sl,available:false,patientId:s.patientId,patientName:s.patientName,serviceId:s.serviceId,serviceName:s.serviceName,serviceDuration:s.serviceDuration}:sl);
+            } else {
+              const newSlot={id:uid(),time:toTime,endTime:"",available:false,patientId:s.patientId,patientName:s.patientName,serviceId:s.serviceId,serviceName:s.serviceName,serviceDuration:s.serviceDuration||30,clinic:s.clinic||""};
+              newTargetSlots=[...targetBase,newSlot].sort((a,b)=>a.time.localeCompare(b.time));
+            }
+            const ns={...S.schedule};
+            if(isSameDay){
+              ns[toDate]={...(S.schedule[toDate]||{blocks:[],slots:[]}),slots:newTargetSlots};
+            } else {
+              ns[fromDate]={...(S.schedule[fromDate]||{blocks:[],slots:[]}),slots:(S.schedule[fromDate]?.slots||[]).map(sl=>sl.id===s.id?freedSlot:sl)};
+              ns[toDate]={...(S.schedule[toDate]||{blocks:[],slots:[]}),slots:newTargetSlots};
+            }
+            S.schedule=ns;
+            triggerSave(["schedule"]);
+            detWrap.innerHTML="";SCR.openSlotId=null;
+            rebSlots();
+          }},"Подтвердить перенос"),
+          h("button",{cls:"btn bs bsm",onclick:()=>{showRf=false;rfWrap.style.display="none";rfBtn.style.display="inline-flex";}},"Отмена")
+        ));
+        const rfBtn=h("button",{cls:"btn bs",onclick:()=>{showRf=true;rfWrap.style.display="block";rfBtn.style.display="none";}},"📅 Перенести");
+        box.appendChild(rfBtn);box.appendChild(rfWrap);
+        box.appendChild(h("div",{sty:{display:"flex",gap:8,marginTop:8}},
           pp?h("button",{cls:"btn bp",sty:{flex:1},onclick:()=>{detWrap.innerHTML="";detWrap.appendChild(renderPatDetail(pp,role,()=>detWrap.innerHTML=""));}},"Открыть карточку"):null,
           h("button",{cls:"btn bs",onclick:async()=>{
             const ns={...S.schedule,[SCR.schDate]:{...S.schedule[SCR.schDate],slots:(S.schedule[SCR.schDate]?.slots||[]).map(sl=>sl.id!==s.id?sl:{...sl,available:true,patientId:null,patientName:null,serviceId:null,serviceName:null})}};
@@ -1714,21 +1760,23 @@ function renderDoctor(){
   sb.appendChild(footer);
   const main=h("div",{cls:"dmain"});
   // Live data helpers — called in rebMain and updateDashLive
+  function getDashDate(){return SCR.dashDate||td;}
   function computeLiveData(){
-    // ПРИЁМЫ СЕГОДНЯ: записаны сегодня, приём ещё не состоялся (исключаем уже принятых/прооперированных/наблюдение/завершён/отменён)
+    const dd=getDashDate();
+    // ПРИЁМЫ НА ВЫБРАННУЮ ДАТУ: записаны, приём ещё не состоялся (исключаем уже принятых/прооперированных/наблюдение/завершён/отменён)
     const _cityF=getCityFilter();
-    const todaySl=(S.schedule[td]?.slots||[])
+    const todaySl=(S.schedule[dd]?.slots||[])
       .filter(s=>!s.available&&s.patientId&&(_cityF==="all"||slotMatchesCity(s,_cityF)))
       .map(s=>{const pat=S.patients.find(x=>x.id===s.patientId);return{...s,_patStatus:pat?.status,_patExists:!!pat};})
       .filter(s=>s._patExists&&!["consulted","operated","followup","completed","cancelled"].includes(s._patStatus));
     // Re-compute cancelled for city
-    const todaySlotPatIds2=new Set((S.schedule[td]?.slots||[]).filter(s=>s.patientId&&(_cityF==="all"||slotMatchesCity(s,_cityF))).map(s=>s.patientId));
+    const todaySlotPatIds2=new Set((S.schedule[dd]?.slots||[]).filter(s=>s.patientId&&(_cityF==="all"||slotMatchesCity(s,_cityF))).map(s=>s.patientId));
 
-    // ПРЕДСТОЯЩИЕ ОПЕРАЦИИ: дата операции = сегодня (статус preop)
-    const upOps=S.patients.filter(p=>p.opDate===td&&["preop","scheduled","new"].includes(p.status)&&(_cityF==="all"||patMatchesCity(p,_cityF)))
+    // ОПЕРАЦИИ НА ВЫБРАННУЮ ДАТУ
+    const upOps=S.patients.filter(p=>p.opDate===dd&&["preop","scheduled","new"].includes(p.status)&&(_cityF==="all"||patMatchesCity(p,_cityF)))
       .sort((a,b)=>(a.name||"").localeCompare(b.name||""));
 
-    // ОТМЕНЁННЫЕ ПРИЁМЫ: были записаны сегодня, статус отменён
+    // ОТМЕНЁННЫЕ ПРИЁМЫ на выбранную дату
     const cancelled=filterPatsByCity(S.patients,_cityF).filter(p=>p.status==="cancelled"&&todaySlotPatIds2.has(p.id));
 
     return{todaySl,upOps,cancelled};
@@ -1741,7 +1789,7 @@ function renderDoctor(){
     if(SCR.dview==="dashboard"&&!SCR.editId){
       const scrollY=main.scrollTop;
       main.innerHTML="";
-      main.appendChild(docDash(todaySl,upOps,cancelled,td,rebMain));
+      main.appendChild(docDash(todaySl,upOps,cancelled,getDashDate(),rebMain));
       main.scrollTop=scrollY;
     }
     // Always update nav badge and sidebar counts
@@ -1764,7 +1812,7 @@ function renderDoctor(){
         SCR.editId=null;SCR.patTab=null;SCR._lastPatId=null;rebMain();
       }));
     }
-    else if(SCR.dview==="dashboard")main.appendChild(docDash(todaySl,upOps,cancelled,td,rebMain));
+    else if(SCR.dview==="dashboard")main.appendChild(docDash(todaySl,upOps,cancelled,getDashDate(),rebMain));
     else if(SCR.dview==="patients")main.appendChild(docPats(td,rebMain));
     else if(SCR.dview==="schedule")main.appendChild(renderSchedule(S.session.role));
     else if(SCR.dview==="changepw"){
@@ -1796,19 +1844,27 @@ function renderDoctor(){
 
 function docDash(todaySl,upOps,cancelled,td,reb){
   const wrap=h("div",{});
+  const isToday=td===today();
+  function shiftDate(days){const d=new Date(td+"T12:00:00");d.setDate(d.getDate()+days);return localDateStr(d);}
   wrap.appendChild(h("h2",{sty:{fontSize:22,fontWeight:800,marginBottom:4}},"Дашборд"));
-  wrap.appendChild(h("div",{sty:{fontSize:13,color:"#6B7280",marginBottom:20}},fmtF(td)));
+  wrap.appendChild(h("div",{sty:{display:"flex",alignItems:"center",gap:8,flexWrap:"wrap",marginBottom:20}},
+    h("button",{cls:"btn bs bsm",onclick:()=>{SCR.dashDate=shiftDate(-1);reb();}},"←"),
+    h("input",{cls:"fi",type:"date",value:td,sty:{width:160,padding:"7px 10px"},onchange:e=>{if(e.target.value){SCR.dashDate=e.target.value;reb();}}}),
+    h("button",{cls:"btn bs bsm",onclick:()=>{SCR.dashDate=shiftDate(1);reb();}},"→"),
+    !isToday?h("button",{cls:"btn bp bsm",onclick:()=>{SCR.dashDate=null;reb();}},"Сегодня"):null,
+    h("div",{sty:{fontSize:13,color:"#6B7280"}},fmtF(td))
+  ));
 
   // Metric cards
   wrap.appendChild(h("div",{cls:"sg"},
     h("div",{cls:"sc"},h("div",{cls:"sn"},S.patients.length),h("div",{cls:"sl"},"Пациентов")),
-    h("div",{cls:"sc"},h("div",{cls:"sn"},todaySl.length),h("div",{cls:"sl"},"Сегодня")),
+    h("div",{cls:"sc"},h("div",{cls:"sn"},todaySl.length),h("div",{cls:"sl"},isToday?"Сегодня":"Записи")),
     h("div",{cls:"sc"},h("div",{cls:"sn",sty:{color:upOps.length?"#D97706":"var(--p)"}},upOps.length),h("div",{cls:"sl"},"Операции"))
   ));
 
-  // 1. ПРИЁМЫ СЕГОДНЯ
+  // 1. ПРИЁМЫ
+  wrap.appendChild(h("div",{cls:"st"},"📋 Приёмы"+(isToday?" сегодня":" — "+fmtD(td))));
   if(todaySl.length){
-    wrap.appendChild(h("div",{cls:"st"},"📋 Приёмы сегодня"));
     todaySl.forEach(s=>wrap.appendChild(h("div",{cls:"crow",onclick:()=>{SCR.openEdit=true;SCR.editId=s.patientId;reb();}},
       h("div",{sty:{fontWeight:800,fontSize:16,color:"var(--p)",width:44,textAlign:"center",flexShrink:0}},s.time),
       h("div",{},
@@ -1817,12 +1873,11 @@ function docDash(todaySl,upOps,cancelled,td,reb){
       )
     )));
   } else {
-    wrap.appendChild(h("div",{cls:"st"},"📋 Приёмы сегодня"));
-    wrap.appendChild(h("div",{sty:{fontSize:13,color:"var(--mu)",padding:"8px 0 4px"}},"Нет записей на сегодня"));
+    wrap.appendChild(h("div",{sty:{fontSize:13,color:"var(--mu)",padding:"8px 0 4px"}},isToday?"Нет записей на сегодня":"Нет записей на эту дату"));
   }
 
-  // 2. ПРЕДСТОЯЩИЕ ОПЕРАЦИИ (сегодня)
-  wrap.appendChild(h("div",{cls:"st",sty:{marginTop:4}},"🔪 Операции сегодня"));
+  // 2. ОПЕРАЦИИ
+  wrap.appendChild(h("div",{cls:"st",sty:{marginTop:4}},"🔪 Операции"+(isToday?" сегодня":" — "+fmtD(td))));
   if(upOps.length){
     upOps.forEach(p=>wrap.appendChild(h("div",{cls:"crow",onclick:()=>{SCR.openEdit=true;SCR.editId=p.id;reb();}},
       h("div",{},
@@ -1831,7 +1886,7 @@ function docDash(todaySl,upOps,cancelled,td,reb){
       )
     )));
   } else {
-    wrap.appendChild(h("div",{sty:{fontSize:13,color:"var(--mu)",padding:"8px 0 4px"}},"Нет операций на сегодня"));
+    wrap.appendChild(h("div",{sty:{fontSize:13,color:"var(--mu)",padding:"8px 0 4px"}},isToday?"Нет операций на сегодня":"Нет операций на эту дату"));
   }
 
   // 3. ОТМЕНЁННЫЕ ПРИЁМЫ
