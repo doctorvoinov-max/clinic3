@@ -1874,6 +1874,15 @@ function docPats(td,reb){
     {key:"nextContact",label:"Контакт",filterable:false}
   ];
   function rawVal(p,col){return col==="opPrice"?(Number(p.opPrice)||0):(p[col]||"");}
+  function sortKey(p,col){
+    const v=rawVal(p,col);
+    if(col==="_fs"||col==="opDate"||col==="nextContact"){
+      if(!v)return -Infinity;
+      const t=Date.parse(v);
+      return isNaN(t)?-Infinity:t;
+    }
+    return v;
+  }
   function filterLabel(col,v){
     if(col==="status")return ST[v]?.l||v||"—";
     if(col==="_fs")return v?fmtD(v):"—";
@@ -1927,7 +1936,7 @@ function docPats(td,reb){
     const{col:sortCol,dir}=SCR.patSort;
     const mul=dir==="asc"?1:-1;
     const fl=[...filtered].sort((a,b)=>{
-      const av=rawVal(a,sortCol),bv=rawVal(b,sortCol);
+      const av=sortKey(a,sortCol),bv=sortKey(b,sortCol);
       if(typeof av==="number"||typeof bv==="number")return mul*((Number(av)||0)-(Number(bv)||0));
       return mul*String(av).localeCompare(String(bv));
     });
@@ -1951,7 +1960,10 @@ function docPats(td,reb){
         const filterBtn=h("button",{type:"button",sty:{border:"none",background:"none",cursor:"pointer",padding:"0 0 0 6px",fontSize:11,color:activeCount?"var(--p)":"var(--hi)",fontWeight:activeCount?700:400}},activeCount?"▼"+activeCount:"▼");
         filterBtn.onclick=(e)=>{
           e.stopPropagation();
-          const uniques=[...new Set(withFs.map(p=>rawVal(p,c.key)))].sort((x,y)=>typeof x==="number"?x-y:String(x).localeCompare(String(y)));
+          const uniques=[...new Set(withFs.map(p=>rawVal(p,c.key)))].sort((x,y)=>{
+            if(c.key==="_fs"){const tx=Date.parse(x)||0,ty=Date.parse(y)||0;return tx-ty;}
+            return typeof x==="number"?x-y:String(x).localeCompare(String(y));
+          });
           openFilterPanel(c.key,filterBtn,uniques);
         };
         thChildren.push(filterBtn);
